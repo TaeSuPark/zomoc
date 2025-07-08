@@ -2,6 +2,7 @@
 import { createMockDataFromZodSchema } from "./generator"
 import type { ZodTypeAny } from "zod"
 import type { AxiosInstance } from "axios"
+import { match } from "path-to-regexp"
 
 export interface SetupMockingInterceptorOptions {
   enabled: boolean
@@ -25,37 +26,56 @@ export function setupMockingInterceptor(
     if (!url || !method) return config
 
     const requestMethod = method.toUpperCase()
-    const requestKey = `${requestMethod} ${url}`
 
-    // Find a matching key in the registry
-    if (registry[requestKey]) {
-      const schema = registry[requestKey]
-      const mockData = createMockDataFromZodSchema(schema)
+    for (const key in registry) {
+      const parts = key.split(" ")
+      if (parts.length < 2) continue
 
-      if (debug) {
-        console.groupCollapsed(
-          `%c[Zomoc] Mocked Request: %c${requestMethod} ${url}`,
-          "color: #6e28d9; font-weight: bold;",
-          "color: #10b981;"
-        )
-        console.log("%cMatched Key:", "font-weight: bold;", requestKey)
-        console.log("%cGenerated Mock Data:", "font-weight: bold;", mockData)
-        console.log("%cUsed Zod Schema:", "font-weight: bold;", schema)
-        console.groupEnd()
+      const mockMethod = parts[0].toUpperCase()
+      const mockUrlPattern = parts.slice(1).join(" ")
+
+      if (requestMethod !== mockMethod) {
+        continue
       }
 
-      config.adapter = (config: any) => {
-        return new Promise((resolve) => {
-          const res = {
-            data: mockData,
-            status: 200,
-            statusText: "OK",
-            headers: { "x-zomoc-mocked": "true" },
-            config,
-            request: {},
-          }
-          resolve(res as any)
-        })
+      const matchFn = match(mockUrlPattern, { decode: decodeURIComponent })
+      const matchResult = matchFn(url)
+
+      if (matchResult) {
+        const schema = registry[key]
+        const mockData = createMockDataFromZodSchema(schema)
+
+        if (debug) {
+          console.groupCollapsed(
+            `%c[Zomoc] Mocked Request: %c${requestMethod} ${url}`,
+            "color: #6e28d9; font-weight: bold;",
+            "color: #10b981;"
+          )
+          console.log("%cURL Pattern:", "font-weight: bold;", key)
+          console.log(
+            "%cMatched Params:",
+            "font-weight: bold;",
+            matchResult.params
+          )
+          console.log("%cGenerated Mock Data:", "font-weight: bold;", mockData)
+          console.log("%cUsed Zod Schema:", "font-weight: bold;", schema)
+          console.groupEnd()
+        }
+
+        config.adapter = (config: any) => {
+          return new Promise((resolve) => {
+            const res = {
+              data: mockData,
+              status: 200,
+              statusText: "OK",
+              headers: { "x-zomoc-mocked": "true" },
+              config,
+              request: {},
+            }
+            resolve(res as any)
+          })
+        }
+        break // Stop after finding the first matching pattern
       }
     }
 

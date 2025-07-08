@@ -1,5 +1,5 @@
 import type { Plugin, ResolvedConfig, HmrContext } from "vite"
-import { generateRegistryString, ZomocCoreOptions } from "./core.js"
+import { generateRegistryString, ZomocCoreOptions } from "./core"
 
 const VIRTUAL_MODULE_ID = "virtual:zomoc"
 const RESOLVED_VIRTUAL_MODULE_ID = "\0" + VIRTUAL_MODULE_ID

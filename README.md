@@ -8,6 +8,7 @@ Zomoc is a Vite plugin that automatically generates API mocks based on your Type
 - **Fully Automated**: No more manual CLI commands. Mocks are auto-generated and updated on file changes.
 - **Zero Source Code Pollution**: Creates no files in your project. Everything is handled in memory via a virtual module.
 - **Type-Safe Mocks**: Leverages `zod` to create mocks that are always in sync with your TypeScript interfaces.
+- **Dynamic Route Matching**: Uses `path-to-regexp` under the hood to support dynamic URL patterns like `/users/:id`.
 - **Flexible Configuration**: Easily target specific mock files using glob patterns.
 
 ## Installation
@@ -16,13 +17,13 @@ Zomoc is a Vite plugin that automatically generates API mocks based on your Type
 npm install -D zomoc
 ```
 
-`zomoc` has `axios`, `zod`, and `vite` as peer dependencies. npm 7+ will install them automatically if they are not already in your project.
+`zomoc` has `axios` and `zod` as peer dependencies. npm 7+ will install them automatically if they are not already in your project.
 
 ## How it works
 
 1.  You add the `zomoc()` plugin to your `vite.config.ts`.
 2.  During development, the plugin scans your project for `mock.json` files.
-3.  For each `mock.json`, it finds the corresponding `interface.ts` file.
+3.  For each `mock.json`, it finds the corresponding `interface.ts` file in a sibling `model` directory.
 4.  It uses `ts-to-zod` to generate Zod schemas from your interfaces **in-memory**.
 5.  It creates a virtual module, `virtual:zomoc`, which exports the `finalSchemaUrlMap` object containing all your mock data schemas.
 6.  You import `setupMockingInterceptor` from `zomoc` and the `finalSchemaUrlMap` from the virtual module to configure your `axios` instance.
@@ -53,38 +54,53 @@ export default defineConfig({
 })
 ```
 
-### 2. File Structure Convention
+### 2. Configure TypeScript
+
+To make TypeScript aware of the `virtual:zomoc` module, add `zomoc/client` to the `types` array in your `tsconfig.json`.
+
+```json
+{
+  "compilerOptions": {
+    // ... other options
+    "types": ["zomoc/client"]
+  }
+}
+```
+
+### 3. File Structure Convention
 
 `zomoc` assumes a conventional file structure for your features. For each feature, you should have:
 
 ```
 src/
 └── entities/
-    └── MyFeature/
+    └── User/
         ├── api/
         │   └── mock.json
         └── model/
             └── interface.ts
 ```
 
-### 3. Create `mock.json`
+### 4. Create `mock.json`
 
-This file maps API endpoints to the names of the TypeScript interfaces for their response data.
+This file maps API endpoints (including the HTTP method) to the names of the TypeScript interfaces for their response data.
 
-**Example:** `src/entities/MyFeature/api/mock.json`
+**Example:** `src/entities/User/api/mock.json`
 
 ```json
 {
-  "/my-feature": "IMyFeatureResponse",
-  "/my-feature/:id": "IMyFeatureDetailResponse"
+  "GET /users": "IUserListResponse",
+  "GET /users/:id": "IUserDetailResponse",
+  "POST /users": "ICreateUserResponse"
 }
 ```
 
-### 4. Setup the Interceptor
+### 5. Setup the Interceptor
 
 In your central `axios` configuration file, import from `zomoc` and the `virtual:zomoc` module.
 
 ```typescript
+// src/shared/api/index.ts
 import axios, { AxiosInstance } from "axios"
 import { setupMockingInterceptor } from "zomoc"
 // Import the registry from the virtual module provided by the plugin
@@ -95,11 +111,12 @@ const createApiInstance = (): AxiosInstance => {
     baseURL: "https://api.example.com",
   })
 
-  // The interceptor is only active in development mode.
-  // The plugin ensures the virtual module is only available during dev.
   setupMockingInterceptor(instance, {
+    // The interceptor is only active in development mode.
     enabled: import.meta.env.DEV,
     registry: finalSchemaUrlMap,
+    // Optional: Log mocked requests to the console for easy debugging.
+    debug: true,
   })
 
   return instance
@@ -108,4 +125,8 @@ const createApiInstance = (): AxiosInstance => {
 export const api = createApiInstance()
 ```
 
-That's it! Run your dev server, and your API calls will be mocked automatically.
+That's it! Run your dev server (`vite`), and your API calls that match the patterns in `mock.json` will be mocked automatically. Check your browser's developer console to see the mocked requests and responses.
+
+## License
+
+This project is licensed under the MIT License.
