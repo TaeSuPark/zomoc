@@ -1,41 +1,59 @@
 {
   "name": "zomoc",
   "version": "1.0.0",
-  "description": "An axios interceptor-based automatic API mocking tool that operates with Zod schemas.",
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "description": "An automatic API mocking tool for Vite, powered by axios and Zod.",
   "type": "module",
-  "bin": {
-    "zomoc": "bin/cli.js"
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./vite": {
+      "require": "./dist/vite.cjs",
+      "import": "./dist/vite.js",
+      "types": "./dist/vite.d.ts"
+    },
+    "./client": {
+      "types": "./client.d.ts"
+    }
   },
+  "files": [
+    "dist",
+    "client.d.ts"
+  ],
   "scripts": {
-    "build": "tsc",
+    "build": "tsup",
     "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "peerDependencies": {
     "axios": ">=0.21.0",
+    "vite": ">=3.0.0",
     "zod": ">=3.0.0"
+  },
+  "dependencies": {
+    "glob": "^10.4.2",
+    "ts-to-zod": "^3.1.0"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/node": "^20.14.9",
+    "typescript": "^5.5.2",
+    "tsup": "^8.1.0"
   },
   "keywords": [
     "axios",
     "mock",
     "interceptor",
     "zod",
-    "typescript"
+    "typescript",
+    "vite",
+    "plugin"
   ],
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "commander": "^12.1.0",
-    "glob": "^10.4.2"
-  },
-  "devDependencies": {
-    "@types/glob": "^9.0.0",
-    "@types/node": "^24.0.10",
-    "axios": "^1.10.0",
-    "typescript": "^5.8.3",
-    "zod": "^3.25.75"
-  }
+  "license": "ISC"
 }

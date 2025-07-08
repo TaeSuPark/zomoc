@@ -1,8 +1,6 @@
 // src/shared/lib/mockingInterceptor.ts
 import { AxiosInstance, InternalAxiosRequestConfig } from "axios"
-import { z } from "zod"
-// @ts-ignore - 이 파일은 런타임(모킹 실행 시)에만 존재합니다.
-import { finalSchemaUrlMap } from "./mock.registry.js"
+import { z, ZodTypeAny } from "zod"
 import { createMockDataFromZodSchema } from "./generator.js"
 
 /**
@@ -14,23 +12,33 @@ export interface MockingInterceptorOptions {
    * The user is responsible for checking their own environment variables.
    */
   enabled?: boolean
+  /**
+   * The generated mock registry object.
+   * The user should import `finalSchemaUrlMap` from the generated `mock.registry.ts`
+   * and pass it here.
+   */
+  registry?: { [key: string]: ZodTypeAny }
 }
 
 /**
  * 요청 URL과 finalSchemaUrlMap을 비교하여 일치하는 Zod 스키마를 찾습니다.
  * 동적 경로(:param)를 지원합니다.
  * @param url - 요청 URL
+ * @param registry - The mock data registry.
  * @returns 찾은 Zod 스키마 또는 undefined
  */
-function findSchemaForUrl(url: string): z.ZodTypeAny | undefined {
+function findSchemaForUrl(
+  url: string,
+  registry: { [key: string]: ZodTypeAny }
+): z.ZodTypeAny | undefined {
   // 1. 완전 일치하는 URL이 있는지 먼저 확인합니다.
-  if (finalSchemaUrlMap[url]) {
-    return finalSchemaUrlMap[url]
+  if (registry[url]) {
+    return registry[url]
   }
 
   // 2. 동적 경로 패턴을 확인합니다.
   const urlParts = url.split("/").filter(Boolean)
-  const schemaEntries = Object.entries(finalSchemaUrlMap)
+  const schemaEntries = Object.entries(registry)
 
   for (const [pattern, schema] of schemaEntries) {
     const patternParts = pattern.split("/").filter(Boolean)
@@ -65,13 +73,13 @@ export function setupMockingInterceptor(
 ) {
   instance.interceptors.request.use(
     async (config: InternalAxiosRequestConfig) => {
-      // 1. 목킹 기능이 명시적으로 활성화되지 않았으면, 즉시 요청을 그대로 반환합니다.
-      if (options?.enabled !== true) {
+      // 1. 목킹 기능이 명시적으로 활성화되지 않았거나, 레지스트리가 없으면 즉시 요청을 그대로 반환합니다.
+      if (options?.enabled !== true || !options.registry) {
         return config
       }
 
       // 2. 요청 URL에 해당하는 스키마가 목킹 레지스트리에 있는지 확인합니다. (동적 경로 지원)
-      const schema = findSchemaForUrl(config.url || "")
+      const schema = findSchemaForUrl(config.url || "", options.registry)
 
       // 3. 스키마가 존재한다면 (목킹 대상이라면)
       if (schema) {
