@@ -3,6 +3,7 @@ import { generate } from "ts-to-zod"
 import path from "path"
 import fs from "fs/promises"
 import { z } from "zod"
+import camelCase from "camelcase"
 
 export interface ZomocCoreOptions {
   /**
@@ -80,7 +81,8 @@ export async function generateRegistryString(
       // Map URLs to their schema variable names
       for (const urlAndMethod in urlMap) {
         const interfaceNameFromJson = urlMap[urlAndMethod]
-        const zodSchemaName = `${interfaceNameFromJson}Schema`
+        const schemaVariableName = camelCase(interfaceNameFromJson)
+        const zodSchemaName = `${schemaVariableName}Schema`
         urlToSchemaNameMap[urlAndMethod] = zodSchemaName
       }
     } catch (error) {

@@ -1,5 +1,5 @@
 // src/shared/lib/mockingInterceptor.ts
-import { createMockDataFromZodSchema } from "./generator"
+import { createMockDataFromZodSchema, CustomGenerators } from "./generator"
 import type { ZodTypeAny } from "zod"
 import type { AxiosInstance } from "axios"
 import { match } from "path-to-regexp"
@@ -8,13 +8,14 @@ export interface SetupMockingInterceptorOptions {
   enabled: boolean
   registry: Record<string, ZodTypeAny>
   debug?: boolean
+  customGenerators?: CustomGenerators
 }
 
 export function setupMockingInterceptor(
   instance: AxiosInstance,
   options: SetupMockingInterceptorOptions
 ) {
-  const { enabled, registry, debug = false } = options
+  const { enabled, registry, debug = false, customGenerators } = options
 
   if (!enabled) {
     return
@@ -43,7 +44,11 @@ export function setupMockingInterceptor(
 
       if (matchResult) {
         const schema = registry[key]
-        const mockData = createMockDataFromZodSchema(schema)
+        const mockData = createMockDataFromZodSchema(
+          schema,
+          "",
+          customGenerators
+        )
 
         if (debug) {
           console.groupCollapsed(
