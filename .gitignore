@@ -1,0 +1,24 @@
+# Dependencies
+/node_modules
+
+# Build output
+/dist
+
+# Generated files (for local testing)
+**/*.zod.ts
+mock.registry.ts
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# OS generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db 

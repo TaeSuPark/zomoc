@@ -1,0 +1,41 @@
+{
+  "name": "zomoc",
+  "version": "1.0.0",
+  "description": "An axios interceptor-based automatic API mocking tool that operates with Zod schemas.",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "bin": {
+    "zomoc": "bin/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "peerDependencies": {
+    "axios": ">=0.21.0",
+    "zod": ">=3.0.0"
+  },
+  "keywords": [
+    "axios",
+    "mock",
+    "interceptor",
+    "zod",
+    "typescript"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "commander": "^12.1.0",
+    "glob": "^10.4.2"
+  },
+  "devDependencies": {
+    "@types/glob": "^9.0.0",
+    "@types/node": "^24.0.10",
+    "axios": "^1.10.0",
+    "typescript": "^5.8.3",
+    "zod": "^3.25.75"
+  }
+}
