@@ -42,8 +42,9 @@
   "devDependencies": {
     "@types/glob": "^8.1.0",
     "@types/node": "^20.14.9",
-    "typescript": "^5.5.2",
-    "tsup": "^8.1.0"
+    "@types/path-to-regexp": "^1.7.0",
+    "tsup": "^8.1.0",
+    "typescript": "^5.5.2"
   },
   "keywords": [
     "axios",

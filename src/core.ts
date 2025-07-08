@@ -78,10 +78,10 @@ export async function generateRegistryString(
       }
 
       // Map URLs to their schema variable names
-      for (const url in urlMap) {
-        const interfaceNameFromJson = urlMap[url]
+      for (const urlAndMethod in urlMap) {
+        const interfaceNameFromJson = urlMap[urlAndMethod]
         const zodSchemaName = `${interfaceNameFromJson}Schema`
-        urlToSchemaNameMap[url] = zodSchemaName
+        urlToSchemaNameMap[urlAndMethod] = zodSchemaName
       }
     } catch (error) {
       console.warn(`[Zomoc] Warning: Failed to process ${mockFile}.`, error)
@@ -99,8 +99,8 @@ export async function generateRegistryString(
 
   // 2. Build the final map object that references the schema variables.
   const schemaEntries = Object.entries(urlToSchemaNameMap)
-    .map(([url, schemaName]) => {
-      return `  '${url}': ${schemaName}`
+    .map(([urlAndMethod, schemaName]) => {
+      return `  '${urlAndMethod}': ${schemaName}`
     })
     .join(",\n")
 
