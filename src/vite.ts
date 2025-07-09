@@ -38,7 +38,12 @@ export default function zomoc(options?: ZomocVitePluginOptions): Plugin {
     // 3. 고유 ID에 해당하는 모듈을 요청받으면, 코어 엔진을 실행하여 내용을 생성합니다.
     async load(id: string) {
       if (id === RESOLVED_VIRTUAL_MODULE_ID) {
-        return generateRegistryString(projectRoot, finalOptions)
+        const projectRoot = process.cwd()
+        const registryString = await generateRegistryString(projectRoot, {
+          mockPaths: finalOptions.mockPaths,
+          interfacePaths: finalOptions.interfacePaths,
+        })
+        return registryString
       }
     },
 

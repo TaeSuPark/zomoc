@@ -16,6 +16,7 @@ It's not a zero-config tool, but a "low-config" one. With a few lines in your `v
 - **Flexible File Structure**: Locate your mock definitions and interface files anywhere in your project using glob patterns.
 - **Dynamic Route Matching**: Supports dynamic URL patterns like `/users/:id` out of the box.
 - **HMR for Mocks**: Mocks are automatically updated on the fly when you change your definitions.
+- **Pagination Support**: Automatically generates paginated responses and intelligently handles both paginated and regular array types.
 - **Custom Data Generators**: Hook in your own data generation logic (e.g., using `@faker-js/faker`) for more realistic mock data.
 
 ## Installation
@@ -113,6 +114,46 @@ That's it! Now, when your app calls `api.get('/users')` in dev mode, Zomoc will 
 ## 📚 In-Depth Guide
 
 This section covers advanced configuration and features.
+
+### Pagination Mocking
+
+Zomoc can intelligently mock paginated API responses. When a `pagination` configuration is provided for a specific endpoint, Zomoc will read the page and size from the request (query params or body) and generate the exact number of items requested.
+
+**1. Configure the `pagination` object in your mock definition:**
+
+In your `mock.json`, instead of just a type name string, use an object with a `responseType` and a `pagination` key.
+
+**`src/api/mock.json`**
+
+```json
+{
+  "GET /users": {
+    "responseType": "IUserListResponse",
+    "pagination": {
+      "itemsKey": "users",
+      "totalKey": "total",
+      "pageKey": "page",
+      "sizeKey": "size"
+    }
+  }
+}
+```
+
+- `itemsKey`: The key in your response object that holds the array of items (e.g., `users`).
+- `totalKey`: The key for the total number of items (e.g., `total`).
+- `pageKey`: The key for the page number in the request's query params or body.
+- `sizeKey`: The key for the page size in the request's query params or body.
+
+**2. Make an API call with pagination params:**
+
+```typescript
+// e.g., GET /users?page=1&size=10
+api.get("/users", { params: { page: 1, size: 10 } })
+```
+
+Zomoc will intercept this call and return a response where the `users` array contains exactly 10 mock items.
+
+> **Note**: If an endpoint is configured for pagination, `zomoc` will generate the requested number of items. For regular array responses (like `IUser[]`) that are **not** configured for pagination, it will automatically generate a random number of items (1-3) to make the data feel more dynamic.
 
 ### Customizing File Paths
 

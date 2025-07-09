@@ -1,12 +1,22 @@
 // src/shared/lib/mockingInterceptor.ts
 import { createMockDataFromZodSchema, CustomGenerators } from "./generator"
 import type { ZodTypeAny } from "zod"
-import type { AxiosInstance } from "axios"
+import type { AxiosInstance, AxiosRequestConfig } from "axios"
 import { match } from "path-to-regexp"
+
+interface RegistryValue {
+  schema: ZodTypeAny
+  pagination?: {
+    itemsKey: string
+    totalKey: string
+    pageKey?: string
+    sizeKey?: string
+  }
+}
 
 export interface SetupMockingInterceptorOptions {
   enabled: boolean
-  registry: Record<string, ZodTypeAny>
+  registry: Record<string, RegistryValue>
   debug?: boolean
   customGenerators?: CustomGenerators
 }
@@ -43,12 +53,33 @@ export function setupMockingInterceptor(
       const matchResult = matchFn(url)
 
       if (matchResult) {
-        const schema = registry[key]
-        const mockData = createMockDataFromZodSchema(
-          schema,
-          "",
-          customGenerators
-        )
+        const { schema, pagination } = registry[key]
+
+        let mockData
+        if (pagination) {
+          const pageKey = pagination.pageKey || "page"
+          const sizeKey = pagination.sizeKey || "size"
+
+          const page = config.params?.[pageKey] || config.data?.[pageKey] || 1
+          const size = config.params?.[sizeKey] || config.data?.[sizeKey] || 10
+
+          const itemSchema = (schema as any).shape[pagination.itemsKey]
+          const pageData = createMockDataFromZodSchema(
+            itemSchema,
+            "",
+            customGenerators,
+            size,
+            page
+          )
+
+          mockData = {
+            [pagination.itemsKey]: pageData,
+            [pagination.totalKey]: 100, //  Dummy total
+            [pageKey]: page,
+          }
+        } else {
+          mockData = createMockDataFromZodSchema(schema, "", customGenerators)
+        }
 
         if (debug) {
           console.groupCollapsed(

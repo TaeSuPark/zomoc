@@ -1,5 +1,24 @@
 // src/shared/lib/mockGenerator.ts
-import { z, ZodTypeAny, ZodFirstPartyTypeKind } from "zod"
+import {
+  ZodTypeAny,
+  z,
+  ZodString,
+  ZodNumber,
+  ZodBoolean,
+  ZodDate,
+  ZodArray,
+  ZodObject,
+  ZodRecord,
+  ZodEffects,
+  ZodOptional,
+  ZodNullable,
+  ZodTuple,
+  ZodEnum,
+  ZodLiteral,
+  ZodUnion,
+  ZodDiscriminatedUnion,
+  ZodIntersection,
+} from "zod"
 
 // Helper functions for random data
 const getRandomString = (key: string) => {
@@ -31,65 +50,135 @@ export interface CustomGenerators {
 export function createMockDataFromZodSchema(
   schema: ZodTypeAny,
   key: string = "",
-  customGenerators?: CustomGenerators
-): unknown {
-  // Check for schema existence and definition
-  if (!schema?._def) {
-    return null
+  customGenerators?: CustomGenerators,
+  repeatCount: number = 1,
+  seed: number = 0
+): any {
+  if (schema instanceof ZodOptional || schema instanceof ZodNullable) {
+    return createMockDataFromZodSchema(
+      schema._def.innerType,
+      key,
+      customGenerators
+    )
+  }
+  if (schema instanceof ZodEffects) {
+    return createMockDataFromZodSchema(
+      schema._def.schema,
+      key,
+      customGenerators
+    )
   }
 
-  const typeName = schema._def.typeName
+  if (schema instanceof ZodArray) {
+    const itemSchema = schema.element
+    // If repeatCount is explicitly provided (i.e., for pagination), use it.
+    // Otherwise, generate a random number of items for regular arrays.
+    const itemCount =
+      repeatCount > 1 ? repeatCount : Math.floor(Math.random() * 3) + 1
 
-  switch (typeName) {
-    case ZodFirstPartyTypeKind.ZodObject: {
-      const shape = schema._def.shape()
-      const result: { [key: string]: unknown } = {}
-      for (const prop in shape) {
-        result[prop] = createMockDataFromZodSchema(
-          shape[prop],
-          prop,
-          customGenerators
-        )
-      }
-      return result
-    }
-    case ZodFirstPartyTypeKind.ZodString:
-      if (schema._def.checks?.some((check: any) => check.kind === "datetime")) {
-        return customGenerators?.dateTime?.() ?? getRandomDateTime()
-      }
-      return customGenerators?.string?.(key) ?? getRandomString(key)
-    case ZodFirstPartyTypeKind.ZodNumber:
-      return customGenerators?.number?.() ?? getRandomNumber()
-    case ZodFirstPartyTypeKind.ZodBoolean:
-      return customGenerators?.boolean?.() ?? getRandomBoolean()
-    case ZodFirstPartyTypeKind.ZodArray:
-      // Create an array with 1 to 3 mock elements
-      return Array.from({ length: Math.floor(Math.random() * 3) + 1 }, () =>
-        createMockDataFromZodSchema(schema._def.type, key, customGenerators)
+    return Array.from({ length: itemCount }, (_, i) =>
+      createMockDataFromZodSchema(
+        itemSchema,
+        `${key}[${i}]`,
+        customGenerators,
+        1, //  For nested arrays, always generate 1 item unless specified
+        seed * itemCount + i
       )
-    case ZodFirstPartyTypeKind.ZodOptional:
-    case ZodFirstPartyTypeKind.ZodNullable:
-      // 50% chance of being null/undefined
-      return Math.random() > 0.5
-        ? createMockDataFromZodSchema(
-            schema._def.innerType,
-            key,
-            customGenerators
-          )
-        : null
-    case ZodFirstPartyTypeKind.ZodEffects:
-      // Handle transformed schemas (e.g., z.preprocess)
-      return createMockDataFromZodSchema(
-        schema._def.schema,
-        key,
+    )
+  }
+
+  if (schema instanceof ZodObject) {
+    const shape = schema.shape
+    const mockData: Record<string, any> = {}
+    for (const field in shape) {
+      mockData[field] = createMockDataFromZodSchema(
+        shape[field],
+        field,
         customGenerators
       )
-    case ZodFirstPartyTypeKind.ZodDefault:
-      return schema._def.defaultValue()
-    default:
-      console.warn(
-        `[Mock Generator] Unhandled Zod type: ${typeName} for key: ${key}`
-      )
-      return null
+    }
+    return mockData
   }
+
+  if (schema instanceof ZodRecord) {
+    // Generate a few key-value pairs for the record
+    return {
+      key1: createMockDataFromZodSchema(
+        schema.valueSchema,
+        "key1",
+        customGenerators
+      ),
+      key2: createMockDataFromZodSchema(
+        schema.valueSchema,
+        "key2",
+        customGenerators
+      ),
+    }
+  }
+
+  // Handle primitive types
+  if (schema instanceof ZodString) {
+    if (customGenerators?.string) {
+      return customGenerators.string(key)
+    }
+    return getRandomString(key)
+  }
+  if (schema instanceof ZodNumber) {
+    return customGenerators?.number
+      ? customGenerators.number()
+      : getRandomNumber()
+  }
+  if (schema instanceof ZodBoolean) {
+    return customGenerators?.boolean
+      ? customGenerators.boolean()
+      : getRandomBoolean()
+  }
+  if (schema instanceof ZodDate) {
+    return customGenerators?.dateTime
+      ? customGenerators.dateTime()
+      : getRandomDateTime()
+  }
+
+  if (schema instanceof ZodTuple) {
+    return schema.items.map((item: ZodTypeAny, i: number) =>
+      createMockDataFromZodSchema(item, `${key}[${i}]`, customGenerators)
+    )
+  }
+
+  if (schema instanceof ZodEnum) {
+    return schema.options[0]
+  }
+
+  if (schema instanceof ZodLiteral) {
+    return schema.value
+  }
+
+  if (schema instanceof ZodUnion) {
+    // For simplicity, always use the first type in the union
+    return createMockDataFromZodSchema(schema.options[0], key, customGenerators)
+  }
+
+  if (schema instanceof ZodDiscriminatedUnion) {
+    // For simplicity, always use the first option
+    const firstOption = schema.options.get(schema.options.keys().next().value)
+    return createMockDataFromZodSchema(firstOption, key, customGenerators)
+  }
+
+  if (schema instanceof ZodIntersection) {
+    // This is a bit tricky. We'll merge the mock data from both schemas.
+    const mockLeft = createMockDataFromZodSchema(
+      schema._def.left,
+      key,
+      customGenerators
+    )
+    const mockRight = createMockDataFromZodSchema(
+      schema._def.right,
+      key,
+      customGenerators
+    )
+    // Simple merge, might not be perfect for all cases
+    return { ...mockLeft, ...mockRight }
+  }
+
+  return "unhandled zod type"
 }
