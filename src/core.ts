@@ -81,7 +81,9 @@ export async function generateRegistryString(
       // Map URLs to their schema variable names
       for (const urlAndMethod in urlMap) {
         const interfaceNameFromJson = urlMap[urlAndMethod]
-        const schemaVariableName = camelCase(interfaceNameFromJson)
+        const schemaVariableName = camelCase(interfaceNameFromJson, {
+          preserveConsecutiveUppercase: true,
+        })
         const zodSchemaName = `${schemaVariableName}Schema`
         urlToSchemaNameMap[urlAndMethod] = zodSchemaName
       }

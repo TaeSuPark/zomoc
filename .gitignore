@@ -22,3 +22,8 @@ yarn-error.log*
 .Trashes
 ehthumbs.db
 Thumbs.db 
+
+# Lockfiles
+package-lock.json
+yarn.lock
+pnpm-lock.yaml 
