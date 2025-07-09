@@ -1,17 +1,22 @@
-# Zomoc: The Zero-Effort Mocking Companion for Vite
+[English](./README.md) | [한국어](./README.ko.md)
 
-Zomoc is a Vite plugin that automatically generates API mocks based on your TypeScript interfaces. It's designed for a seamless developer experience: define your data shapes once, and get type-safe mocks during development with zero manual steps.
+---
+
+# Zomoc: A Type-Safe Mocking Plugin for Decoupling Your Frontend in Vite
+
+Zomoc is a Vite plugin designed for one primary purpose: to **decouple** your frontend development from a backend API that is unstable, in flux, or not yet available. By automatically generating mock data that strictly adheres to your TypeScript interfaces, Zomoc ensures you can continue building UIs with confidence, knowing your data structures are always in sync.
+
+It's not a zero-config tool, but a "low-config" one. With a few lines in your `vite.config.ts`, you gain a powerful, type-safe development track, allowing you to work independently of backend changes or availability.
 
 ## Features
 
-- **Seamless Vite Integration**: A true Vite plugin for a zero-effort setup.
-- **Fully Automated**: No more manual CLI commands. Mocks are auto-generated and updated on file changes.
-- **Zero Source Code Pollution**: Creates no files in your project. Everything is handled in memory via a virtual module.
-- **Type-Safe Mocks**: Leverages `zod` to create mocks that are always in sync with your TypeScript interfaces.
-- **Dynamic Route Matching**: Uses `path-to-regexp` under the hood to support dynamic URL patterns like `/users/:id`.
-- **Flexible File Structure**: No more rigid folder structures. Zomoc finds your interface files wherever they are in your project.
+- **Reliable API Decoupling**: Keep developing your UI without interruption, even when the real API is down or changing.
+- **Structural Type-Safety**: Guarantees your mock data's structure always matches your TypeScript interfaces, preventing data-shape-related bugs.
+- **Highly Automated**: Scans your code to generate mock data, keeping it in sync with your type definitions.
+- **Flexible File Structure**: Locate your mock definitions and interface files anywhere in your project using glob patterns.
+- **Dynamic Route Matching**: Supports dynamic URL patterns like `/users/:id` out of the box.
+- **HMR for Mocks**: Mocks are automatically updated on the fly when you change your definitions.
 - **Custom Data Generators**: Hook in your own data generation logic (e.g., using `@faker-js/faker`) for more realistic mock data.
-- **Hot Module Replacement (HMR)**: Mocks are automatically updated when you change your mock files or interfaces, without a page reload.
 
 ## Installation
 
@@ -21,49 +26,29 @@ npm install -D zomoc
 
 `zomoc` has `axios` and `zod` as peer dependencies. npm 7+ will install them automatically if they are not already in your project.
 
-## How it works
+## 🚀 Getting Started
 
-1.  You add the `zomoc()` plugin to your `vite.config.ts`.
-2.  The plugin scans your project for TypeScript files (e.g., `interface.ts`, `type.ts`) to create an index of all exported interfaces and their file locations. This is done quickly with regular expressions, not a full AST parse.
-3.  It then finds your mock definition files (e.g., `mock.json`) based on the patterns you provide.
-4.  For each API endpoint in your mock files, it looks up the required interface name in its index, reads the corresponding file, and generates a Zod schema from the interface **in-memory** using `ts-to-zod`.
-5.  It creates a virtual module, `virtual:zomoc`, which exports the `finalSchemaUrlMap` object containing all your mock data schemas.
-6.  You import `setupMockingInterceptor` from `zomoc` and the `finalSchemaUrlMap` from the virtual module to configure your `axios` instance.
-7.  Whenever you change a mock or interface file, the plugin automatically regenerates the mocks and reloads your app.
+Here’s how to get Zomoc up and running in 3 steps.
 
-## Usage
+### 1. Configure Vite & TypeScript
 
-### 1. Configure Vite
+Add `zomoc` to your `vite.config.ts` and update `tsconfig.json` to recognize the virtual module.
 
-Add the `zomoc` plugin to your `vite.config.ts`.
+**`vite.config.ts`**
 
 ```typescript
 // vite.config.ts
 import { defineConfig } from "vite"
-import react from "@vitejs/plugin-react"
 import zomoc from "zomoc/vite"
 
 export default defineConfig({
   plugins: [
-    react(),
-    // Add zomoc plugin
-    zomoc({
-      // Optional: Specify where your mock definition files are.
-      // Defaults to ['**/mock.json']
-      mockPaths: ["src/features/**/mock.json"],
-
-      // Optional: Specify where your interface/type definition files are.
-      // Zomoc scans these to find the source of your interfaces.
-      // Defaults to ['**/interface.ts', '**/type.ts']
-      interfacePaths: ["src/features/**/model/*.ts"],
-    }),
+    zomoc(), // Add the plugin
   ],
 })
 ```
 
-### 2. Configure TypeScript
-
-To make TypeScript aware of the `virtual:zomoc` module, add `zomoc/client` to the `types` array in your `tsconfig.json`.
+**`tsconfig.json`**
 
 ```json
 {
@@ -74,41 +59,19 @@ To make TypeScript aware of the `virtual:zomoc` module, add `zomoc/client` to th
 }
 ```
 
-### 3. Create Mock and Interface Files
+### 2. Create a Mock and an Interface
 
-With Zomoc, you are free to structure your project however you like. Zomoc will find your mock and interface files as long as they match the glob patterns provided in the Vite config.
+Create a `mock.json` file and a corresponding `types.ts` file.
 
-For example, you could organize by feature:
-
-```
-src/
-└── features/
-    └── User/
-        ├── api/
-        │   └── mock.json
-        └── model/
-            └── types.ts
-```
-
-**`mock.json`**
-
-This file maps API endpoints (including the HTTP method) to the names of the TypeScript interfaces for their response data.
-
-Example: `src/features/User/api/mock.json`
+**`src/api/mock.json`**
 
 ```json
 {
-  "GET /users": "IUserListResponse",
-  "GET /users/:id": "IUserDetailResponse",
-  "POST /users": "ICreateUserResponse"
+  "GET /users": "IUserListResponse"
 }
 ```
 
-**`types.ts`**
-
-This file contains the actual TypeScript interface definitions.
-
-Example: `src/features/User/model/types.ts`
+**`src/api/types.ts`**
 
 ```typescript
 export interface IUser {
@@ -117,49 +80,95 @@ export interface IUser {
   email: string
 }
 
-// An interface can extend another
-export interface IUserDetailResponse extends IUser {
-  profile: string
-  lastLogin: string
-}
-
 export interface IUserListResponse {
   users: IUser[]
   total: number
 }
-
-export interface ICreateUserResponse {
-  success: boolean
-  userId: string
-}
 ```
 
-### 4. Setup the Interceptor
+### 3. Activate the Interceptor
 
-In your central `axios` configuration file, import from `zomoc` and the `virtual:zomoc` module.
+In your central `axios` configuration, set up the interceptor.
 
 ```typescript
 // src/shared/api/index.ts
-import axios, { AxiosInstance } from "axios"
+import axios from "axios"
 import { setupMockingInterceptor } from "zomoc"
-// Import the registry from the virtual module provided by the plugin
-import { finalSchemaUrlMap } from "virtual:zomoc"
+import { finalSchemaUrlMap } from "virtual:zomoc" // Import from the virtual module
 
-const createApiInstance = (): AxiosInstance => {
-  const instance = axios.create({
-    baseURL: "https://api.example.com",
-  })
+const api = axios.create({ baseURL: "https://api.example.com" })
 
-  setupMockingInterceptor(instance, {
-    // The interceptor is only active in development mode.
-    enabled: import.meta.env.DEV,
-    registry: finalSchemaUrlMap,
-    // Optional: Log mocked requests to the console for easy debugging.
-    debug: true,
-  })
+// Zomoc will now intercept calls made with this instance
+setupMockingInterceptor(api, {
+  enabled: import.meta.env.DEV, // Active only in development
+  registry: finalSchemaUrlMap,
+  debug: true, // Optional: log mocked requests
+})
 
-  return instance
+export { api }
+```
+
+That's it! Now, when your app calls `api.get('/users')` in dev mode, Zomoc will serve a type-safe mock response.
+
+## 📚 In-Depth Guide
+
+This section covers advanced configuration and features.
+
+### Customizing File Paths
+
+By default, Zomoc searches for `**/mock.json`, `**/interface.ts`, and `**/type.ts`. You can override this in your Vite config.
+
+```typescript
+// vite.config.ts
+import zomoc from "zomoc/vite"
+
+export default {
+  plugins: [
+    zomoc({
+      // Glob patterns for your mock definition files.
+      mockPaths: ["src/features/**/mock.json"],
+      // Glob patterns for your TypeScript interface files.
+      interfacePaths: ["src/features/**/model/*.ts"],
+    }),
+  ],
+}
+```
+
+### Custom Data Generators
+
+By default, `zomoc` generates simple placeholder data. For more realistic mocks, you can provide your own generator functions using the `customGenerators` option. This is powerful when combined with a library like [`@faker-js/faker`](https://fakerjs.dev/).
+
+**1. First, install faker:**
+
+```bash
+npm install -D @faker-js/faker
+```
+
+**2. Then, pass your custom generators to the interceptor:**
+
+```typescript
+// src/shared/api/index.ts
+import { setupMockingInterceptor, type CustomGenerators } from "zomoc"
+import { faker } from "@faker-js/faker"
+
+// Define your custom generator functions
+const customGenerators: CustomGenerators = {
+  string: (key) => {
+    if (key.toLowerCase().includes("email")) return faker.internet.email()
+    if (key.toLowerCase().includes("name")) return faker.person.fullName()
+    return faker.lorem.sentence()
+  },
+  number: () => faker.number.int({ max: 1000 }),
 }
 
-export const api = createApiInstance()
+setupMockingInterceptor(api, {
+  // ...other options
+  customGenerators,
+})
 ```
+
+With this setup, `zomoc` will call your functions to generate context-aware data.
+
+## License
+
+This project is licensed under the MIT License.
