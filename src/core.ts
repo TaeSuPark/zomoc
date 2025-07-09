@@ -1,46 +1,80 @@
 import { glob } from "glob"
 import { generate } from "ts-to-zod"
-import path from "path"
 import fs from "fs/promises"
 import { z } from "zod"
 import camelCase from "camelcase"
 
 export interface ZomocCoreOptions {
-  /**
-   * Glob pattern to find mock definition files.
-   * @default '**' /mock.json'
-   */
-  mockMapPattern?: string
+  mockPaths?: string[]
+  interfacePaths?: string[]
 }
 
 const schema = z.record(z.string())
 type MockUrlMap = z.infer<typeof schema>
 
-/**
- * Generates the mock registry content as a string based on mock map files.
- * This function is framework-agnostic and does not write to the filesystem.
- *
- * @param projectRoot - The absolute path to the root of the user's project.
- * @param options - Configuration options for the core engine.
- * @returns The content of the virtual `mock.registry.ts` file.
- */
+async function createInterfaceIndex(
+  projectRoot: string,
+  interfacePaths: string[]
+): Promise<Map<string, string>> {
+  const interfaceLocationMap = new Map<string, string>()
+  const files = await glob(interfacePaths, {
+    cwd: projectRoot,
+    absolute: true,
+    ignore: "node_modules/**",
+  })
+
+  const interfaceRegex = /export\s+(?:interface|type)\s+([A-Za-z0-9_]+)/g
+
+  for (const file of files) {
+    try {
+      const content = await fs.readFile(file, "utf-8")
+      let match
+      while ((match = interfaceRegex.exec(content)) !== null) {
+        // match[1] is the interface name
+        if (interfaceLocationMap.has(match[1])) {
+          console.warn(
+            `[Zomoc] Warning: Duplicate interface name "${
+              match[1]
+            }" found in ${file}. The one in ${interfaceLocationMap.get(
+              match[1]
+            )} will be used.`
+          )
+        } else {
+          interfaceLocationMap.set(match[1], file)
+        }
+      }
+    } catch (e) {
+      console.warn(`[Zomoc] Failed to read or parse ${file}`, e)
+    }
+  }
+
+  return interfaceLocationMap
+}
+
 export async function generateRegistryString(
   projectRoot: string,
   options?: ZomocCoreOptions
 ): Promise<string> {
-  const mockMapPattern = options?.mockMapPattern || "**/mock.json"
+  const interfacePaths = options?.interfacePaths || []
+  const interfaceLocationMap = await createInterfaceIndex(
+    projectRoot,
+    interfacePaths
+  )
 
-  const mockFiles = await glob(mockMapPattern, {
+  const mockPaths = options?.mockPaths || []
+  const mockFiles = await glob(mockPaths, {
     cwd: projectRoot,
     absolute: true,
     ignore: "node_modules/**",
   })
 
   if (mockFiles.length === 0) {
-    return `// Zomoc: No mock files found matching "${mockMapPattern}"\nexport const finalSchemaUrlMap = {};\n`
+    return `// Zomoc: No mock files found matching "${
+      mockPaths.join(", ") || "[]"
+    }"\nexport const finalSchemaUrlMap = {};\n`
   }
 
-  const allSchemaDefinitions = new Map<string, string>() // Key: interface file path, Value: full zod schema string
+  const allSchemaDefinitions = new Map<string, string>() // Key: interface FILE PATH, Value: full zod schema string
   const urlToSchemaNameMap: Record<string, string> = {}
 
   for (const mockFile of mockFiles) {
@@ -48,64 +82,56 @@ export async function generateRegistryString(
       const mockFileContent = await fs.readFile(mockFile, "utf-8")
       const urlMap: MockUrlMap = schema.parse(JSON.parse(mockFileContent))
 
-      const interfaceFile = path.resolve(
-        path.dirname(mockFile),
-        "..",
-        "model",
-        "interface.ts"
-      )
-
-      // Generate schemas only once per interface file to avoid duplication
-      if (!allSchemaDefinitions.has(interfaceFile)) {
-        try {
-          const sourceText = await fs.readFile(interfaceFile, "utf-8")
-          const zodSchemasFileContent = generate({
-            sourceText,
-            keepComments: false,
-          }).getZodSchemasFile("")
-
-          // Remove the import statement as we'll add it once manually at the top.
-          const schemasWithoutImport = zodSchemasFileContent.replace(
-            /import { z } from "zod";\s*/,
-            ""
-          )
-          allSchemaDefinitions.set(interfaceFile, schemasWithoutImport)
-        } catch (e) {
+      for (const [urlAndMethod, interfaceName] of Object.entries(urlMap)) {
+        const interfaceFile = interfaceLocationMap.get(interfaceName)
+        if (!interfaceFile) {
           console.warn(
-            `[Zomoc] Could not read or process interface file: ${interfaceFile}`
+            `[Zomoc] Warning: Interface "${interfaceName}" specified in ${mockFile} was not found in any of the scanned interface paths.`
           )
-          continue // Skip to next mockFile if interface file is missing
+          continue
         }
-      }
 
-      // Map URLs to their schema variable names
-      for (const urlAndMethod in urlMap) {
-        const interfaceNameFromJson = urlMap[urlAndMethod]
-        const schemaVariableName = camelCase(interfaceNameFromJson, {
+        if (!allSchemaDefinitions.has(interfaceFile)) {
+          try {
+            const sourceText = await fs.readFile(interfaceFile, "utf-8")
+            const zodSchemasFileContent = generate({
+              sourceText,
+              keepComments: false,
+            }).getZodSchemasFile("")
+            const schemasWithoutImport = zodSchemasFileContent.replace(
+              /import { z } from "zod";\s*/,
+              ""
+            )
+            allSchemaDefinitions.set(interfaceFile, schemasWithoutImport)
+          } catch (e) {
+            console.warn(
+              `[Zomoc] Could not generate schema from file: ${interfaceFile}`,
+              e
+            )
+          }
+        }
+
+        const schemaVariableName = camelCase(interfaceName, {
           preserveConsecutiveUppercase: true,
         })
-        const zodSchemaName = `${schemaVariableName}Schema`
-        urlToSchemaNameMap[urlAndMethod] = zodSchemaName
+        const finalSchemaName = `${
+          schemaVariableName.charAt(0).toLowerCase() +
+          schemaVariableName.slice(1)
+        }Schema`
+        urlToSchemaNameMap[urlAndMethod] = finalSchemaName
       }
     } catch (error) {
       console.warn(`[Zomoc] Warning: Failed to process ${mockFile}.`, error)
     }
   }
 
-  // Build the final registry string
   let finalRegistryString = `// Zomoc: Auto-generated mock registry. Do not edit.\nimport { z } from 'zod';\n\n`
-
-  // 1. Append all schema definitions from all files first.
-  // This ensures base schemas are defined before they are extended.
   for (const schemaFileContent of allSchemaDefinitions.values()) {
     finalRegistryString += `${schemaFileContent}\n`
   }
 
-  // 2. Build the final map object that references the schema variables.
   const schemaEntries = Object.entries(urlToSchemaNameMap)
-    .map(([urlAndMethod, schemaName]) => {
-      return `  '${urlAndMethod}': ${schemaName}`
-    })
+    .map(([urlAndMethod, schemaName]) => `  '${urlAndMethod}': ${schemaName}`)
     .join(",\n")
 
   finalRegistryString += `\nexport const finalSchemaUrlMap = {\n${schemaEntries}\n};\n`

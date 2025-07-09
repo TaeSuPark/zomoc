@@ -1,5 +1,6 @@
 import type { Plugin, ResolvedConfig, HmrContext } from "vite"
 import { generateRegistryString, ZomocCoreOptions } from "./core"
+import micromatch from "micromatch"
 
 const VIRTUAL_MODULE_ID = "virtual:zomoc"
 const RESOLVED_VIRTUAL_MODULE_ID = "\0" + VIRTUAL_MODULE_ID
@@ -8,6 +9,16 @@ export interface ZomocVitePluginOptions extends ZomocCoreOptions {}
 
 export default function zomoc(options?: ZomocVitePluginOptions): Plugin {
   let projectRoot: string
+
+  const finalOptions: Required<ZomocVitePluginOptions> = {
+    mockPaths: options?.mockPaths || ["**/mock.json"],
+    interfacePaths: options?.interfacePaths || [
+      "**/interface.ts",
+      "**/type.ts",
+    ],
+    // Ensure all optional fields from ZomocCoreOptions are handled, even if empty
+    ...options,
+  }
 
   return {
     name: "zomoc-vite-plugin",
@@ -27,16 +38,18 @@ export default function zomoc(options?: ZomocVitePluginOptions): Plugin {
     // 3. 고유 ID에 해당하는 모듈을 요청받으면, 코어 엔진을 실행하여 내용을 생성합니다.
     async load(id: string) {
       if (id === RESOLVED_VIRTUAL_MODULE_ID) {
-        return generateRegistryString(projectRoot, options)
+        return generateRegistryString(projectRoot, finalOptions)
       }
     },
 
     // 4. mock 파일이나 interface 파일이 변경되면, 가상 모듈을 다시 로드하도록 Vite에 알립니다.
     async handleHotUpdate({ file, server }: HmrContext) {
-      const mockMapPattern = options?.mockMapPattern || "**/mock.json"
+      const { mockPaths, interfacePaths } = finalOptions
 
-      // A more robust check is needed, this is a simplification
-      if (file.endsWith("mock.json") || file.endsWith("interface.ts")) {
+      const isMockFile = micromatch.isMatch(file, mockPaths)
+      const isInterfaceFile = micromatch.isMatch(file, interfacePaths)
+
+      if (isMockFile || isInterfaceFile) {
         const module = server.moduleGraph.getModuleById(
           RESOLVED_VIRTUAL_MODULE_ID
         )

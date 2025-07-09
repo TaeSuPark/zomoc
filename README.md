@@ -9,7 +9,9 @@ Zomoc is a Vite plugin that automatically generates API mocks based on your Type
 - **Zero Source Code Pollution**: Creates no files in your project. Everything is handled in memory via a virtual module.
 - **Type-Safe Mocks**: Leverages `zod` to create mocks that are always in sync with your TypeScript interfaces.
 - **Dynamic Route Matching**: Uses `path-to-regexp` under the hood to support dynamic URL patterns like `/users/:id`.
-- **Flexible Configuration**: Easily target specific mock files using glob patterns.
+- **Flexible File Structure**: No more rigid folder structures. Zomoc finds your interface files wherever they are in your project.
+- **Custom Data Generators**: Hook in your own data generation logic (e.g., using `@faker-js/faker`) for more realistic mock data.
+- **Hot Module Replacement (HMR)**: Mocks are automatically updated when you change your mock files or interfaces, without a page reload.
 
 ## Installation
 
@@ -22,12 +24,12 @@ npm install -D zomoc
 ## How it works
 
 1.  You add the `zomoc()` plugin to your `vite.config.ts`.
-2.  During development, the plugin scans your project for `mock.json` files.
-3.  For each `mock.json`, it finds the corresponding `interface.ts` file in a sibling `model` directory.
-4.  It uses `ts-to-zod` to generate Zod schemas from your interfaces **in-memory**.
+2.  The plugin scans your project for TypeScript files (e.g., `interface.ts`, `type.ts`) to create an index of all exported interfaces and their file locations. This is done quickly with regular expressions, not a full AST parse.
+3.  It then finds your mock definition files (e.g., `mock.json`) based on the patterns you provide.
+4.  For each API endpoint in your mock files, it looks up the required interface name in its index, reads the corresponding file, and generates a Zod schema from the interface **in-memory** using `ts-to-zod`.
 5.  It creates a virtual module, `virtual:zomoc`, which exports the `finalSchemaUrlMap` object containing all your mock data schemas.
 6.  You import `setupMockingInterceptor` from `zomoc` and the `finalSchemaUrlMap` from the virtual module to configure your `axios` instance.
-7.  Whenever you change a `mock.json` or `interface.ts` file, the plugin automatically regenerates the mocks and reloads your app.
+7.  Whenever you change a mock or interface file, the plugin automatically regenerates the mocks and reloads your app.
 
 ## Usage
 
@@ -46,9 +48,14 @@ export default defineConfig({
     react(),
     // Add zomoc plugin
     zomoc({
-      // Optional: Specify where your mock files are.
-      // Defaults to '/**/mock.json'
-      mockMapPattern: "src/entities/**/mock.json",
+      // Optional: Specify where your mock definition files are.
+      // Defaults to ['**/mock.json']
+      mockPaths: ["src/features/**/mock.json"],
+
+      // Optional: Specify where your interface/type definition files are.
+      // Zomoc scans these to find the source of your interfaces.
+      // Defaults to ['**/interface.ts', '**/type.ts']
+      interfacePaths: ["src/features/**/model/*.ts"],
     }),
   ],
 })
@@ -67,25 +74,27 @@ To make TypeScript aware of the `virtual:zomoc` module, add `zomoc/client` to th
 }
 ```
 
-### 3. File Structure Convention
+### 3. Create Mock and Interface Files
 
-`zomoc` assumes a conventional file structure for your features. For each feature, you should have:
+With Zomoc, you are free to structure your project however you like. Zomoc will find your mock and interface files as long as they match the glob patterns provided in the Vite config.
+
+For example, you could organize by feature:
 
 ```
 src/
-└── entities/
+└── features/
     └── User/
         ├── api/
         │   └── mock.json
         └── model/
-            └── interface.ts
+            └── types.ts
 ```
 
-### 4. Create `mock.json`
+**`mock.json`**
 
 This file maps API endpoints (including the HTTP method) to the names of the TypeScript interfaces for their response data.
 
-**Example:** `src/entities/User/api/mock.json`
+Example: `src/features/User/api/mock.json`
 
 ```json
 {
@@ -95,7 +104,37 @@ This file maps API endpoints (including the HTTP method) to the names of the Typ
 }
 ```
 
-### 5. Setup the Interceptor
+**`types.ts`**
+
+This file contains the actual TypeScript interface definitions.
+
+Example: `src/features/User/model/types.ts`
+
+```typescript
+export interface IUser {
+  id: string
+  name: string
+  email: string
+}
+
+// An interface can extend another
+export interface IUserDetailResponse extends IUser {
+  profile: string
+  lastLogin: string
+}
+
+export interface IUserListResponse {
+  users: IUser[]
+  total: number
+}
+
+export interface ICreateUserResponse {
+  success: boolean
+  userId: string
+}
+```
+
+### 4. Setup the Interceptor
 
 In your central `axios` configuration file, import from `zomoc` and the `virtual:zomoc` module.
 
@@ -124,70 +163,3 @@ const createApiInstance = (): AxiosInstance => {
 
 export const api = createApiInstance()
 ```
-
-That's it! Run your dev server (`vite`), and your API calls that match the patterns in `mock.json` will be mocked automatically. Check your browser's developer console to see the mocked requests and responses.
-
-## Advanced Usage: Custom Data Generators
-
-By default, `zomoc` generates simple placeholder data (e.g., `"temp text: ..."` for strings, a random number for numbers). For more realistic and complex mock data, you can provide your own generator functions using the `customGenerators` option.
-
-This is especially powerful when combined with a library like [`@faker-js/faker`](https://fakerjs.dev/).
-
-**1. First, install faker:**
-
-```bash
-npm install -D @faker-js/faker
-```
-
-**2. Then, pass your custom generators to the interceptor:**
-
-```typescript
-// src/shared/api/index.ts
-import axios from "axios"
-import { setupMockingInterceptor, type CustomGenerators } from "zomoc"
-import { finalSchemaUrlMap } from "virtual:zomoc"
-import { faker } from "@faker-js/faker"
-
-// Define your custom generator functions
-const customGenerators: CustomGenerators = {
-  string: (key) => {
-    if (key.toLowerCase().includes("name")) {
-      return faker.person.fullName()
-    }
-    if (key.toLowerCase().includes("email")) {
-      return faker.internet.email()
-    }
-    if (key.toLowerCase().includes("avatar")) {
-      return faker.image.avatar()
-    }
-    return faker.lorem.sentence()
-  },
-  number: () => faker.number.int({ min: 1, max: 1000 }),
-  dateTime: () => faker.date.past().toISOString(),
-  boolean: () => faker.datatype.boolean(),
-}
-
-const createApiInstance = () => {
-  const instance = axios.create({
-    baseURL: "https://api.example.com",
-  })
-
-  setupMockingInterceptor(instance, {
-    enabled: import.meta.env.DEV,
-    registry: finalSchemaUrlMap,
-    debug: true,
-    // Pass the custom generators
-    customGenerators,
-  })
-
-  return instance
-}
-
-export const api = createApiInstance()
-```
-
-With this setup, `zomoc` will call your functions to generate mock data. For string types, it even passes the property name (`key`), allowing you to generate context-aware data like a full name for a `userName` property.
-
-## License
-
-This project is licensed under the MIT License.
