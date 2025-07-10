@@ -6,9 +6,11 @@ declare module "virtual:zomoc" {
     pagination?: {
       itemsKey: string
       totalKey: string
-      pageKey?: string
-      sizeKey?: string
+      pageKey: string
+      sizeKey: string
     }
+    strategy?: "random" | "fixed"
+    repeatCount?: number
   }
 
   /**

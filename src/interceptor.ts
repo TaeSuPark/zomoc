@@ -12,6 +12,8 @@ interface RegistryValue {
     pageKey?: string
     sizeKey?: string
   }
+  strategy?: "random" | "fixed"
+  repeatCount?: number
 }
 
 export interface SetupMockingInterceptorOptions {
@@ -53,15 +55,15 @@ export function setupMockingInterceptor(
       const matchResult = matchFn(url)
 
       if (matchResult) {
-        const { schema, pagination } = registry[key]
+        const { schema, pagination, strategy, repeatCount } = registry[key]
 
         let mockData
         if (pagination) {
-          const pageKey = pagination.pageKey || "page"
-          const sizeKey = pagination.sizeKey || "size"
+          const pageKey = pagination.pageKey ?? "page"
+          const sizeKey = pagination.sizeKey ?? "size"
 
-          const page = config.params?.[pageKey] || config.data?.[pageKey] || 1
-          const size = config.params?.[sizeKey] || config.data?.[sizeKey] || 10
+          const page = config.params?.[pageKey] ?? config.data?.[pageKey] ?? 1
+          const size = config.params?.[sizeKey] ?? config.data?.[sizeKey] ?? 10
 
           const itemSchema = (schema as any).shape[pagination.itemsKey]
           const pageData = createMockDataFromZodSchema(
@@ -69,7 +71,8 @@ export function setupMockingInterceptor(
             "",
             customGenerators,
             size,
-            page
+            page,
+            strategy
           )
 
           mockData = {
@@ -78,7 +81,14 @@ export function setupMockingInterceptor(
             [pageKey]: page,
           }
         } else {
-          mockData = createMockDataFromZodSchema(schema, "", customGenerators)
+          mockData = createMockDataFromZodSchema(
+            schema,
+            "",
+            customGenerators,
+            repeatCount,
+            0,
+            strategy
+          )
         }
 
         if (debug) {

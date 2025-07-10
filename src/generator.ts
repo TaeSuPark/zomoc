@@ -18,6 +18,7 @@ import {
   ZodUnion,
   ZodDiscriminatedUnion,
   ZodIntersection,
+  ZodNativeEnum,
 } from "zod"
 
 // Helper functions for random data
@@ -51,38 +52,48 @@ export function createMockDataFromZodSchema(
   schema: ZodTypeAny,
   key: string = "",
   customGenerators?: CustomGenerators,
-  repeatCount: number = 1,
-  seed: number = 0
+  repeatCount?: number,
+  seed: number = 0,
+  strategy: "random" | "fixed" = "random"
 ): any {
   if (schema instanceof ZodOptional || schema instanceof ZodNullable) {
     return createMockDataFromZodSchema(
       schema._def.innerType,
       key,
-      customGenerators
+      customGenerators,
+      repeatCount,
+      seed,
+      strategy
     )
   }
   if (schema instanceof ZodEffects) {
     return createMockDataFromZodSchema(
       schema._def.schema,
       key,
-      customGenerators
+      customGenerators,
+      repeatCount,
+      seed,
+      strategy
     )
   }
 
   if (schema instanceof ZodArray) {
     const itemSchema = schema.element
-    // If repeatCount is explicitly provided (i.e., for pagination), use it.
+    // If repeatCount is explicitly provided, use it.
     // Otherwise, generate a random number of items for regular arrays.
     const itemCount =
-      repeatCount > 1 ? repeatCount : Math.floor(Math.random() * 3) + 1
+      typeof repeatCount === "number"
+        ? repeatCount
+        : Math.floor(Math.random() * 3) + 1
 
     return Array.from({ length: itemCount }, (_, i) =>
       createMockDataFromZodSchema(
         itemSchema,
         `${key}[${i}]`,
         customGenerators,
-        1, //  For nested arrays, always generate 1 item unless specified
-        seed * itemCount + i
+        undefined, // Do not pass repeatCount to nested array items
+        seed * itemCount + i,
+        strategy
       )
     )
   }
@@ -94,7 +105,10 @@ export function createMockDataFromZodSchema(
       mockData[field] = createMockDataFromZodSchema(
         shape[field],
         field,
-        customGenerators
+        customGenerators,
+        repeatCount,
+        seed,
+        strategy
       )
     }
     return mockData
@@ -106,12 +120,18 @@ export function createMockDataFromZodSchema(
       key1: createMockDataFromZodSchema(
         schema.valueSchema,
         "key1",
-        customGenerators
+        customGenerators,
+        repeatCount,
+        seed,
+        strategy
       ),
       key2: createMockDataFromZodSchema(
         schema.valueSchema,
         "key2",
-        customGenerators
+        customGenerators,
+        repeatCount,
+        seed,
+        strategy
       ),
     }
   }
@@ -139,14 +159,34 @@ export function createMockDataFromZodSchema(
       : getRandomDateTime()
   }
 
+  if (schema instanceof ZodNativeEnum) {
+    const values = schema._def.values
+    if (strategy === "fixed") {
+      return values[0]
+    }
+    const randomIndex = Math.floor(Math.random() * values.length)
+    return values[randomIndex]
+  }
+
   if (schema instanceof ZodTuple) {
     return schema.items.map((item: ZodTypeAny, i: number) =>
-      createMockDataFromZodSchema(item, `${key}[${i}]`, customGenerators)
+      createMockDataFromZodSchema(
+        item,
+        `${key}[${i}]`,
+        customGenerators,
+        repeatCount,
+        seed,
+        strategy
+      )
     )
   }
 
   if (schema instanceof ZodEnum) {
-    return schema.options[0]
+    if (strategy === "fixed") {
+      return schema.options[0]
+    }
+    const options = schema.options
+    return options[Math.floor(Math.random() * options.length)]
   }
 
   if (schema instanceof ZodLiteral) {
@@ -154,14 +194,55 @@ export function createMockDataFromZodSchema(
   }
 
   if (schema instanceof ZodUnion) {
-    // For simplicity, always use the first type in the union
-    return createMockDataFromZodSchema(schema.options[0], key, customGenerators)
+    const options = schema.options as ZodTypeAny[]
+    if (strategy === "fixed") {
+      return createMockDataFromZodSchema(
+        options[0],
+        key,
+        customGenerators,
+        repeatCount,
+        seed,
+        strategy
+      )
+    }
+    // For union types, randomly pick one of the options to mock.
+    const randomOption = options[Math.floor(Math.random() * options.length)]
+    return createMockDataFromZodSchema(
+      randomOption,
+      key,
+      customGenerators,
+      repeatCount,
+      seed,
+      strategy
+    )
   }
 
   if (schema instanceof ZodDiscriminatedUnion) {
-    // For simplicity, always use the first option
-    const firstOption = schema.options.get(schema.options.keys().next().value)
-    return createMockDataFromZodSchema(firstOption, key, customGenerators)
+    const options: ZodTypeAny[] = Array.from(schema.options.values())
+    if (options.length === 0) {
+      return "unhandled zod type"
+    }
+
+    if (strategy === "fixed") {
+      return createMockDataFromZodSchema(
+        options[0],
+        key,
+        customGenerators,
+        repeatCount,
+        seed,
+        strategy
+      )
+    }
+
+    const randomIndex = Math.floor(Math.random() * options.length)
+    return createMockDataFromZodSchema(
+      options[randomIndex],
+      key,
+      customGenerators,
+      repeatCount,
+      seed,
+      strategy
+    )
   }
 
   if (schema instanceof ZodIntersection) {
@@ -169,12 +250,18 @@ export function createMockDataFromZodSchema(
     const mockLeft = createMockDataFromZodSchema(
       schema._def.left,
       key,
-      customGenerators
+      customGenerators,
+      repeatCount,
+      seed,
+      strategy
     )
     const mockRight = createMockDataFromZodSchema(
       schema._def.right,
       key,
-      customGenerators
+      customGenerators,
+      repeatCount,
+      seed,
+      strategy
     )
     // Simple merge, might not be perfect for all cases
     return { ...mockLeft, ...mockRight }

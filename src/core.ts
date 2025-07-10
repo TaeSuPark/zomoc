@@ -97,12 +97,29 @@ export async function generateRegistryString(
       for (const [key, value] of Object.entries(mockMap)) {
         let interfaceName: string
         let paginationConfig: any = null
+        let mockingStrategy: "random" | "fixed" = "random"
+        let repeatCount: number | undefined
 
         if (typeof value === "string") {
           interfaceName = value
         } else if (typeof value === "object" && value !== null) {
-          interfaceName = (value as any).responseType
-          paginationConfig = (value as any).pagination
+          const mockConfig = value as any
+          interfaceName = mockConfig.responseType
+          if (
+            typeof mockConfig.pagination === "object" &&
+            mockConfig.pagination !== null
+          ) {
+            paginationConfig = mockConfig.pagination
+          }
+          if (
+            mockConfig.mockingStrategy === "fixed" ||
+            mockConfig.mockingStrategy === "random"
+          ) {
+            mockingStrategy = mockConfig.mockingStrategy
+          }
+          if (typeof mockConfig.repeatCount === "number") {
+            repeatCount = mockConfig.repeatCount
+          }
         } else {
           continue
         }
@@ -129,7 +146,9 @@ export async function generateRegistryString(
           const definition = `
   '${key}': {
     schema: ${schemaName},
-    pagination: ${JSON.stringify(paginationConfig) || "null"}
+    pagination: ${JSON.stringify(paginationConfig) || "null"},
+    strategy: '${mockingStrategy}',
+    repeatCount: ${repeatCount ?? "undefined"}
   },`
           finalRegistryEntries.push(definition)
         }
