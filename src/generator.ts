@@ -1,7 +1,6 @@
 // src/shared/lib/mockGenerator.ts
 import {
   ZodTypeAny,
-  z,
   ZodString,
   ZodNumber,
   ZodBoolean,

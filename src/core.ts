@@ -1,27 +1,12 @@
 import { glob } from "glob"
 import { generate } from "ts-to-zod"
 import fs from "fs/promises"
-import { z } from "zod"
 import camelCase from "camelcase"
-import { ZodTypeAny } from "zod"
 
 export interface ZomocCoreOptions {
   mockPaths?: string[]
   interfacePaths?: string[]
 }
-
-interface RegistryValue {
-  schema: ZodTypeAny
-  pagination?: {
-    itemsKey: string
-    totalKey: string
-    pageKey: string
-    sizeKey: string
-  }
-}
-
-const schema = z.record(z.string())
-type MockUrlMap = z.infer<typeof schema>
 
 async function createInterfaceIndex(
   projectRoot: string,
@@ -86,7 +71,6 @@ export async function generateRegistryString(
   }
 
   const allSchemaDefinitions = new Map<string, string>() // Key: interface FILE PATH, Value: full zod schema string
-  const urlToSchemaNameMap: Record<string, string> = {}
   const finalRegistryEntries: string[] = []
 
   for (const mockFile of mockFiles) {

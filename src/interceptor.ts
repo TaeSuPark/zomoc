@@ -1,7 +1,7 @@
 // src/shared/lib/mockingInterceptor.ts
 import { createMockDataFromZodSchema, CustomGenerators } from "./generator"
 import type { ZodTypeAny } from "zod"
-import type { AxiosInstance, AxiosRequestConfig } from "axios"
+import type { AxiosInstance } from "axios"
 import { match } from "path-to-regexp"
 
 interface RegistryValue {

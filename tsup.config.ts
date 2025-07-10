@@ -7,5 +7,5 @@ export default defineConfig({
   clean: true,
   splitting: false,
   sourcemap: true,
-  external: ["micromatch"],
+  external: ["micromatch", "glob", "ts-to-zod", "camelcase", "path-to-regexp"],
 })
