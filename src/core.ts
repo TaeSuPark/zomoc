@@ -130,7 +130,9 @@ export async function generateRegistryString(
           const definition = `
   '${key}': {
     schema: ${schemaName},
-    pagination: ${JSON.stringify(paginationConfig) || "null"},
+    pagination: ${
+      paginationConfig ? JSON.stringify(paginationConfig) : "undefined"
+    },
     strategy: '${mockingStrategy}',
     repeatCount: ${repeatCount ?? "undefined"}
   },`
@@ -150,7 +152,7 @@ export async function generateRegistryString(
 
   const schemaEntries = finalRegistryEntries.join("\n")
 
-  finalRegistryString += `\nexport const finalSchemaUrlMap = {\n${schemaEntries}\n};\n`
+  finalRegistryString += `\nexport const finalSchemaUrlMap = {\n${schemaEntries}\n} as const;\n`
 
   return finalRegistryString
 }

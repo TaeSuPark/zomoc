@@ -92,20 +92,43 @@ export function setupMockingInterceptor(
         }
 
         if (debug) {
-          console.groupCollapsed(
-            `%c[Zomoc] Mocked Request: %c${requestMethod} ${url}`,
-            "color: #6e28d9; font-weight: bold;",
-            "color: #10b981;"
-          )
-          console.log("%cURL Pattern:", "font-weight: bold;", key)
-          console.log(
-            "%cMatched Params:",
-            "font-weight: bold;",
-            matchResult.params
-          )
-          console.log("%cGenerated Mock Data:", "font-weight: bold;", mockData)
-          console.log("%cUsed Zod Schema:", "font-weight: bold;", schema)
-          console.groupEnd()
+          const isServer = typeof window === "undefined"
+
+          if (isServer) {
+            // 서버 환경 (Node.js)에서는 groupCollapsed를 사용할 수 없으므로 단순 로그 사용
+            console.log(`[Zomoc] Mocked Request: ${requestMethod} ${url}`)
+            console.log(`  - Pattern: ${key}`)
+            if (Object.keys(matchResult.params).length > 0) {
+              console.log("  - Matched Params:", matchResult.params)
+            }
+            // 서버에서는 객체를 보기 좋게 출력하기 위해 JSON.stringify 사용
+            console.log(
+              "  - Generated Mock Data:",
+              JSON.stringify(mockData, null, 2)
+            )
+          } else {
+            // 브라우저 환경에서는 기존의 보기 좋은 그룹 로그 사용
+            console.groupCollapsed(
+              `%c[Zomoc] Mocked Request: %c${requestMethod} ${url}`,
+              "color: #6e28d9; font-weight: bold;",
+              "color: #10b981;"
+            )
+            console.log("%cURL Pattern:", "font-weight: bold;", key)
+            if (Object.keys(matchResult.params).length > 0) {
+              console.log(
+                "%cMatched Params:",
+                "font-weight: bold;",
+                matchResult.params
+              )
+            }
+            console.log(
+              "%cGenerated Mock Data:",
+              "font-weight: bold;",
+              mockData
+            )
+            console.log("%cUsed Zod Schema:", "font-weight: bold;", schema)
+            console.groupEnd()
+          }
         }
 
         config.adapter = (config: any) => {
