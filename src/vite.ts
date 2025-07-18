@@ -1,23 +1,24 @@
 import type { Plugin, ResolvedConfig, HmrContext } from "vite"
-import { generateRegistryString, ZomocCoreOptions } from "./core"
+import { generateViteVirtualModule } from "./core"
+import type { ZomocVitePluginOptions } from "./types"
 import micromatch from "micromatch"
 
 const VIRTUAL_MODULE_ID = "virtual:zomoc"
 const RESOLVED_VIRTUAL_MODULE_ID = "\0" + VIRTUAL_MODULE_ID
 
-export interface ZomocVitePluginOptions extends ZomocCoreOptions {}
-
-export default function zomoc(options?: ZomocVitePluginOptions): Plugin {
+export default function zomoc(options: ZomocVitePluginOptions = {}): Plugin {
   let projectRoot: string
 
-  const finalOptions: Required<ZomocVitePluginOptions> = {
-    mockPaths: options?.mockPaths || ["**/mock.json"],
-    interfacePaths: options?.interfacePaths || [
-      "**/interface.ts",
-      "**/type.ts",
-    ],
-    // Ensure all optional fields from ZomocCoreOptions are handled, even if empty
-    ...options,
+  const {
+    mockPaths = ["**/mock.json"],
+    interfacePaths = ["**/interface.ts", "**/type.ts"],
+    ...restOptions
+  } = options
+
+  const finalOptions = {
+    mockPaths,
+    interfacePaths,
+    ...restOptions,
   }
 
   return {
@@ -39,7 +40,7 @@ export default function zomoc(options?: ZomocVitePluginOptions): Plugin {
     async load(id: string) {
       if (id === RESOLVED_VIRTUAL_MODULE_ID) {
         const projectRoot = process.cwd()
-        const registryString = await generateRegistryString(projectRoot, {
+        const registryString = await generateViteVirtualModule(projectRoot, {
           mockPaths: finalOptions.mockPaths,
           interfacePaths: finalOptions.interfacePaths,
         })
@@ -49,10 +50,11 @@ export default function zomoc(options?: ZomocVitePluginOptions): Plugin {
 
     // 4. mock 파일이나 interface 파일이 변경되면, 가상 모듈을 다시 로드하도록 Vite에 알립니다.
     async handleHotUpdate({ file, server }: HmrContext) {
-      const { mockPaths, interfacePaths } = finalOptions
-
-      const isMockFile = micromatch.isMatch(file, mockPaths)
-      const isInterfaceFile = micromatch.isMatch(file, interfacePaths)
+      const isMockFile = micromatch.isMatch(file, finalOptions.mockPaths)
+      const isInterfaceFile = micromatch.isMatch(
+        file,
+        finalOptions.interfacePaths
+      )
 
       if (isMockFile || isInterfaceFile) {
         const module = server.moduleGraph.getModuleById(

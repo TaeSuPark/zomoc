@@ -1,5 +1,6 @@
-export {
-  setupMockingInterceptor,
-  type SetupMockingInterceptorOptions,
-} from "./interceptor"
-export type { CustomGenerators } from "./generator"
+export { setupMockingInterceptor } from "./interceptor"
+export type {
+  SetupMockingInterceptorOptions,
+  CustomGenerators,
+  RegistryValue,
+} from "./types"

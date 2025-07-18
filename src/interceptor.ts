@@ -1,35 +1,16 @@
 // src/shared/lib/mockingInterceptor.ts
-import { createMockDataFromZodSchema, CustomGenerators } from "./generator"
-import type { ZodTypeAny } from "zod"
+import { createMockDataFromZodSchema } from "./generator"
 import type { AxiosInstance } from "axios"
 import { match } from "path-to-regexp"
-
-interface RegistryValue {
-  schema: ZodTypeAny
-  pagination?: {
-    itemsKey: string
-    totalKey: string
-    pageKey?: string
-    sizeKey?: string
-  }
-  strategy?: "random" | "fixed"
-  repeatCount?: number
-}
-
-export interface SetupMockingInterceptorOptions {
-  enabled: boolean
-  registry: Record<string, RegistryValue>
-  debug?: boolean
-  customGenerators?: CustomGenerators
-}
+import type { SetupMockingInterceptorOptions } from "./types"
 
 export function setupMockingInterceptor(
   instance: AxiosInstance,
   options: SetupMockingInterceptorOptions
 ) {
-  const { enabled, registry, debug = false, customGenerators } = options
+  const { enable = true, registry, debug = false, customGenerators } = options
 
-  if (!enabled) {
+  if (!enable) {
     return
   }
 

@@ -2,11 +2,7 @@ import { glob } from "glob"
 import { generate } from "ts-to-zod"
 import fs from "fs/promises"
 import camelCase from "camelcase"
-
-export interface ZomocCoreOptions {
-  mockPaths?: string[]
-  interfacePaths?: string[]
-}
+import type { ZomocCoreOptions } from "./types"
 
 async function createInterfaceIndex(
   projectRoot: string,
@@ -155,4 +151,13 @@ export async function generateRegistryString(
   finalRegistryString += `\nexport const finalSchemaUrlMap = {\n${schemaEntries}\n} as const;\n`
 
   return finalRegistryString
+}
+
+export async function generateViteVirtualModule(
+  projectRoot: string,
+  options?: ZomocCoreOptions
+): Promise<string> {
+  const registryString = await generateRegistryString(projectRoot, options)
+  // Vite 가상 모듈은 브라우저에서 직접 실행되므로, TypeScript 문법인 'as const'를 제거해야 합니다.
+  return registryString.replace(" as const", "")
 }

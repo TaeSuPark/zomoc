@@ -19,6 +19,7 @@ import {
   ZodIntersection,
   ZodNativeEnum,
 } from "zod"
+import { CustomGenerators } from "./types"
 
 // Helper functions for random data
 const getRandomString = (key: string) => {
@@ -32,13 +33,6 @@ const getRandomString = (key: string) => {
 const getRandomNumber = () => Math.floor(1000 + Math.random() * 9000)
 const getRandomBoolean = () => Math.random() > 0.5
 const getRandomDateTime = () => new Date().toISOString()
-
-export interface CustomGenerators {
-  string?: (key: string) => string
-  number?: () => number
-  boolean?: () => boolean
-  dateTime?: () => string
-}
 
 /**
  * Generates mock data from a Zod schema.

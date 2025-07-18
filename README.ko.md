@@ -76,8 +76,8 @@ CLI가 생성한 `.zomoc/registry.ts` 파일을 직접 `import`하여 인터셉�
 ```typescript
 // src/shared/api/index.ts
 import axios from "axios"
-// 'zomoc' 대신 'zomoc/next'를 사용합니다.
-import { setupMockingInterceptor } from "zomoc/next"
+// 'zomoc' 대신 'zomoc/cli'를 사용합니다.
+import { setupMockingInterceptor } from "zomoc/cli"
 // 생성된 파일을 직접 import 합니다.
 import { finalSchemaUrlMap } from "../../.zomoc/registry"
 

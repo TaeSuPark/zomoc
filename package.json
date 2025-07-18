@@ -1,29 +1,34 @@
 {
   "name": "zomoc",
-  "version": "1.0.0",
-  "description": "An automatic API mocking tool for Vite, powered by axios and Zod.",
+  "version": "0.1.0",
+  "description": "A type-safe API mocking tool for frontend development, powered by axios and Zod.",
   "type": "module",
-  "main": "./dist/index.cjs",
-  "module": "./dist/index.js",
+  "main": "./dist/index.js",
+  "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "bin": {
-    "zomoc": "./dist/cli.js"
+    "zomoc": "./dist/bin.js"
   },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "require": "./dist/index.cjs"
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
     },
     "./vite": {
       "types": "./dist/vite.d.ts",
-      "import": "./dist/vite.js",
-      "require": "./dist/vite.cjs"
+      "import": "./dist/vite.mjs",
+      "require": "./dist/vite.js"
     },
-    "./next": {
-      "types": "./dist/next.d.ts",
-      "import": "./dist/next.js",
-      "require": "./dist/next.cjs"
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "import": "./dist/cli.mjs",
+      "require": "./dist/cli.js"
+    },
+    "./types": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/types.mjs",
+      "require": "./dist/types.js"
     },
     "./client": {
       "types": "./client.d.ts"
@@ -34,14 +39,19 @@
     "client.d.ts"
   ],
   "scripts": {
+    "dev": "tsup --watch",
     "build": "tsup",
     "prepublishOnly": "npm run build",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "peerDependencies": {
     "axios": ">=0.21.0",
-    "vite": ">=5.0.0",
     "zod": ">=3.0.0"
+  },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   },
   "dependencies": {
     "camelcase": "^8.0.0",
@@ -62,12 +72,26 @@
   "keywords": [
     "axios",
     "mock",
+    "mocking",
+    "api-mock",
     "interceptor",
     "zod",
     "typescript",
     "vite",
-    "plugin"
+    "plugin",
+    "cli",
+    "dev-tool",
+    "type-safe",
+    "generator"
   ],
-  "author": "",
-  "license": "MIT"
+  "author": "TaeSuPark",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TaeSuPark/zomoc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/TaeSuPark/zomoc/issues"
+  },
+  "homepage": "https://github.com/TaeSuPark/zomoc#readme"
 }
