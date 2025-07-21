@@ -1,6 +1,6 @@
 // src/shared/lib/mockGenerator.ts
 import {
-  ZodTypeAny,
+  ZodType,
   ZodString,
   ZodNumber,
   ZodBoolean,
@@ -8,7 +8,6 @@ import {
   ZodArray,
   ZodObject,
   ZodRecord,
-  ZodEffects,
   ZodOptional,
   ZodNullable,
   ZodTuple,
@@ -17,7 +16,6 @@ import {
   ZodUnion,
   ZodDiscriminatedUnion,
   ZodIntersection,
-  ZodNativeEnum,
 } from "zod"
 import { CustomGenerators } from "./types"
 
@@ -42,16 +40,21 @@ const getRandomDateTime = () => new Date().toISOString()
  * @returns Mock data corresponding to the schema.
  */
 export function createMockDataFromZodSchema(
-  schema: ZodTypeAny,
+  schema: ZodType,
   key: string = "",
   customGenerators?: CustomGenerators,
   repeatCount?: number,
   seed: number = 0,
   strategy: "random" | "fixed" = "random"
 ): any {
+  // 내부 구조는 Zod v4에서 _def → _zod.def로 옮겨가는 과도기 구조이므로, 둘 다 체크
+  const def = (schema as any)._def ?? (schema as any)._zod?.def
+
+  // ZodOptional/ZodNullable
+  // 예시: z.string().optional(), z.number().nullable()
   if (schema instanceof ZodOptional || schema instanceof ZodNullable) {
     return createMockDataFromZodSchema(
-      schema._def.innerType,
+      def.innerType as any,
       key,
       customGenerators,
       repeatCount,
@@ -59,9 +62,11 @@ export function createMockDataFromZodSchema(
       strategy
     )
   }
-  if (schema instanceof ZodEffects) {
+  // ZodEffects (transform/refine 등)
+  // 예시: z.string().transform(val => val.length), z.number().refine(n => n > 0)
+  if ("schema" in def) {
     return createMockDataFromZodSchema(
-      schema._def.schema,
+      (def as any).schema,
       key,
       customGenerators,
       repeatCount,
@@ -70,10 +75,10 @@ export function createMockDataFromZodSchema(
     )
   }
 
+  // ZodArray
+  // 예시: z.array(z.string())
   if (schema instanceof ZodArray) {
     const itemSchema = schema.element
-    // If repeatCount is explicitly provided, use it.
-    // Otherwise, generate a random number of items for regular arrays.
     const itemCount =
       typeof repeatCount === "number"
         ? repeatCount
@@ -81,16 +86,18 @@ export function createMockDataFromZodSchema(
 
     return Array.from({ length: itemCount }, (_, i) =>
       createMockDataFromZodSchema(
-        itemSchema,
+        itemSchema as any,
         `${key}[${i}]`,
         customGenerators,
-        undefined, // Do not pass repeatCount to nested array items
+        undefined,
         seed * itemCount + i,
         strategy
       )
     )
   }
 
+  // ZodObject
+  // 예시: z.object({ name: z.string(), age: z.number() })
   if (schema instanceof ZodObject) {
     const shape = schema.shape
     const mockData: Record<string, any> = {}
@@ -107,11 +114,12 @@ export function createMockDataFromZodSchema(
     return mockData
   }
 
+  // ZodRecord
+  // 예시: z.record(z.string(), z.number())
   if (schema instanceof ZodRecord) {
-    // Generate a few key-value pairs for the record
     return {
       key1: createMockDataFromZodSchema(
-        schema.valueSchema,
+        def.valueType as any,
         "key1",
         customGenerators,
         repeatCount,
@@ -119,7 +127,7 @@ export function createMockDataFromZodSchema(
         strategy
       ),
       key2: createMockDataFromZodSchema(
-        schema.valueSchema,
+        def.valueType as any,
         "key2",
         customGenerators,
         repeatCount,
@@ -129,31 +137,42 @@ export function createMockDataFromZodSchema(
     }
   }
 
-  // Handle primitive types
+  // ZodString
+  // 예시: z.string()
   if (schema instanceof ZodString) {
     if (customGenerators?.string) {
       return customGenerators.string(key)
     }
     return getRandomString(key)
   }
+  // ZodNumber
+  // 예시: z.number()
   if (schema instanceof ZodNumber) {
     return customGenerators?.number
       ? customGenerators.number()
       : getRandomNumber()
   }
+  // ZodBoolean
+  // 예시: z.boolean()
   if (schema instanceof ZodBoolean) {
     return customGenerators?.boolean
       ? customGenerators.boolean()
       : getRandomBoolean()
   }
+  // ZodDate
+  // 예시: z.date()
   if (schema instanceof ZodDate) {
     return customGenerators?.dateTime
       ? customGenerators.dateTime()
       : getRandomDateTime()
   }
 
-  if (schema instanceof ZodNativeEnum) {
-    const values = schema._def.values
+  // ZodNativeEnum
+  // 예시: z.nativeEnum(MyEnum)
+  if (def.typeName === "ZodNativeEnum") {
+    const values = (schema as any).getValues
+      ? (schema as any).getValues()
+      : def.values
     if (strategy === "fixed") {
       return values[0]
     }
@@ -161,8 +180,10 @@ export function createMockDataFromZodSchema(
     return values[randomIndex]
   }
 
+  // ZodTuple
+  // 예시: z.tuple([z.string(), z.number()])
   if (schema instanceof ZodTuple) {
-    return schema.items.map((item: ZodTypeAny, i: number) =>
+    return (def.items as any[]).map((item: ZodType, i: number) =>
       createMockDataFromZodSchema(
         item,
         `${key}[${i}]`,
@@ -174,6 +195,8 @@ export function createMockDataFromZodSchema(
     )
   }
 
+  // ZodEnum
+  // 예시: z.enum(["A", "B", "C"])
   if (schema instanceof ZodEnum) {
     if (strategy === "fixed") {
       return schema.options[0]
@@ -182,12 +205,16 @@ export function createMockDataFromZodSchema(
     return options[Math.floor(Math.random() * options.length)]
   }
 
+  // ZodLiteral
+  // 예시: z.literal("foo")
   if (schema instanceof ZodLiteral) {
     return schema.value
   }
 
+  // ZodUnion
+  // 예시: z.union([z.string(), z.number()])
   if (schema instanceof ZodUnion) {
-    const options = schema.options as ZodTypeAny[]
+    const options = schema.options as ZodType[]
     if (strategy === "fixed") {
       return createMockDataFromZodSchema(
         options[0],
@@ -198,7 +225,6 @@ export function createMockDataFromZodSchema(
         strategy
       )
     }
-    // For union types, randomly pick one of the options to mock.
     const randomOption = options[Math.floor(Math.random() * options.length)]
     return createMockDataFromZodSchema(
       randomOption,
@@ -210,8 +236,10 @@ export function createMockDataFromZodSchema(
     )
   }
 
+  // ZodDiscriminatedUnion
+  // 예시: z.discriminatedUnion("type", [z.object({ type: z.literal("a"), ... }), ...])
   if (schema instanceof ZodDiscriminatedUnion) {
-    const options: ZodTypeAny[] = Array.from(schema.options.values())
+    const options: ZodType[] = Array.from((schema.options as any).values())
     if (options.length === 0) {
       return "unhandled zod type"
     }
@@ -238,10 +266,11 @@ export function createMockDataFromZodSchema(
     )
   }
 
+  // ZodIntersection
+  // 예시: z.intersection(z.object({ a: z.string() }), z.object({ b: z.number() }))
   if (schema instanceof ZodIntersection) {
-    // This is a bit tricky. We'll merge the mock data from both schemas.
     const mockLeft = createMockDataFromZodSchema(
-      schema._def.left,
+      def.left as any,
       key,
       customGenerators,
       repeatCount,
@@ -249,14 +278,13 @@ export function createMockDataFromZodSchema(
       strategy
     )
     const mockRight = createMockDataFromZodSchema(
-      schema._def.right,
+      def.right as any,
       key,
       customGenerators,
       repeatCount,
       seed,
       strategy
     )
-    // Simple merge, might not be perfect for all cases
     return { ...mockLeft, ...mockRight }
   }
 

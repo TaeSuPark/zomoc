@@ -1,4 +1,4 @@
-import type { ZodTypeAny } from "zod"
+import type { ZodType } from "zod"
 
 export interface ZomocCoreOptions {
   mockPaths?: string[]
@@ -15,7 +15,7 @@ export interface CustomGenerators {
 }
 
 export interface RegistryValue {
-  schema: ZodTypeAny
+  schema: ZodType
   pagination?: {
     itemsKey: string
     totalKey: string
@@ -31,7 +31,7 @@ export interface SetupMockingInterceptorOptions {
    * @description mocking interceptor를 활성화할지 여부를 결정합니다.
    * @default true
    */
-  enable?: boolean
+  enabled?: boolean
   /**
    * @description zomoc으로 생성된 registry 객체를 전달합니다.
    */

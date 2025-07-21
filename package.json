@@ -46,7 +46,7 @@
   },
   "peerDependencies": {
     "axios": ">=0.21.0",
-    "zod": ">=3.0.0"
+    "zod": ">=3.24.2 <5"
   },
   "peerDependenciesMeta": {
     "vite": {
@@ -67,7 +67,8 @@
     "@types/node": "^20.12.12",
     "@types/path-to-regexp": "^1.7.0",
     "tsup": "^8.0.2",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vite": "^5.4.19"
   },
   "keywords": [
     "axios",

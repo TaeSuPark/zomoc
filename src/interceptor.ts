@@ -8,9 +8,9 @@ export function setupMockingInterceptor(
   instance: AxiosInstance,
   options: SetupMockingInterceptorOptions
 ) {
-  const { enable = true, registry, debug = false, customGenerators } = options
+  const { enabled = true, registry, debug = false, customGenerators } = options
 
-  if (!enable) {
+  if (!enabled) {
     return
   }
 
