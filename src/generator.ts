@@ -33,11 +33,18 @@ const getRandomBoolean = () => Math.random() > 0.5
 const getRandomDateTime = () => new Date().toISOString()
 
 /**
- * Generates mock data from a Zod schema.
- * @param schema The Zod schema to generate data for.
- * @param key The name of the property being generated.
- * @param customGenerators User-defined functions to override default mock data generation.
- * @returns Mock data corresponding to the schema.
+ * Recursively traverses a Zod schema and generates mock data that conforms to it.
+ * It supports a wide range of Zod types, including primitives, objects, arrays, and complex types like unions and intersections.
+ * @description Zod 스키마를 재귀적으로 순회하며 해당 스키마 구조에 맞는 Mock 데이터를 생성합니다.
+ * 원시 타입, 객체, 배열을 포함하여 유니온, 인터섹션과 같은 복잡한 타입까지 광범위한 Zod 타입을 지원합니다.
+ *
+ * @param schema The Zod schema to generate data from. // Mock 데이터를 생성할 Zod 스키마
+ * @param key The name of the property being generated (used for context-aware generation, e.g., for passwords or URLs). // 현재 생성 중인 속성의 이름 (예: 비밀번호, URL 등 문맥에 맞는 데이터 생성에 사용됨)
+ * @param customGenerators User-defined functions to override default mock data generation. // 기본 Mock 데이터 생성을 재정의하는 사용자 정의 함수
+ * @param repeatCount The number of items to generate for arrays. If undefined, a random number of items will be generated. // 배열에 대해 생성할 항목의 수. 지정되지 않으면 랜덤 개수 생성.
+ * @param seed A number used to add variability to random generation, especially within loops. // 특히 루프 내에서 랜덤 생성에 변화를 주기 위한 시드값
+ * @param strategy Determines the generation strategy. 'random' for random values, 'fixed' for predictable values (e.g., first enum value). // 생성 전략. 'random'은 랜덤 값, 'fixed'는 예측 가능한 값 (예: enum의 첫 번째 값)
+ * @returns Mock data corresponding to the schema. // 스키마에 해당하는 Mock 데이터
  */
 export function createMockDataFromZodSchema(
   schema: ZodType,
@@ -47,11 +54,13 @@ export function createMockDataFromZodSchema(
   seed: number = 0,
   strategy: "random" | "fixed" = "random"
 ): any {
-  // 내부 구조는 Zod v4에서 _def → _zod.def로 옮겨가는 과도기 구조이므로, 둘 다 체크
+  // Access the schema definition. This handles a transitional phase in Zod's internal API.
+  // @description Zod의 내부 API 과도기에 대응하기 위해 `_def`와 `_zod.def`를 모두 확인합니다.
   const def = (schema as any)._def ?? (schema as any)._zod?.def
 
-  // ZodOptional/ZodNullable
-  // 예시: z.string().optional(), z.number().nullable()
+  // For optional or nullable types, we simply generate data for the inner type.
+  // Example: z.string().optional(), z.number().nullable()
+  // @description optional 또는 nullable 타입의 경우, 내부 타입에 대해 데이터를 생성합니다.
   if (schema instanceof ZodOptional || schema instanceof ZodNullable) {
     return createMockDataFromZodSchema(
       def.innerType as any,
@@ -62,8 +71,9 @@ export function createMockDataFromZodSchema(
       strategy
     )
   }
-  // ZodEffects (transform/refine 등)
-  // 예시: z.string().transform(val => val.length), z.number().refine(n => n > 0)
+  // For types with effects (e.g., transform, refine), we bypass the effect and use the underlying schema.
+  // Example: z.string().transform(...), z.number().refine(...)
+  // @description transform, refine 등 effect가 있는 타입의 경우, effect를 우회하고 내부 스키마를 사용합니다.
   if ("schema" in def) {
     return createMockDataFromZodSchema(
       (def as any).schema,
@@ -75,8 +85,9 @@ export function createMockDataFromZodSchema(
     )
   }
 
-  // ZodArray
-  // 예시: z.array(z.string())
+  // Handles ZodArray types.
+  // Example: z.array(z.string())
+  // @description ZodArray 타입을 처리합니다.
   if (schema instanceof ZodArray) {
     const itemSchema = schema.element
     const itemCount =
@@ -96,8 +107,9 @@ export function createMockDataFromZodSchema(
     )
   }
 
-  // ZodObject
-  // 예시: z.object({ name: z.string(), age: z.number() })
+  // Handles ZodObject types.
+  // Example: z.object({ name: z.string(), age: z.number() })
+  // @description ZodObject 타입을 처리합니다.
   if (schema instanceof ZodObject) {
     const shape = schema.shape
     const mockData: Record<string, any> = {}
@@ -114,8 +126,9 @@ export function createMockDataFromZodSchema(
     return mockData
   }
 
-  // ZodRecord
-  // 예시: z.record(z.string(), z.number())
+  // Handles ZodRecord types.
+  // Example: z.record(z.string(), z.number())
+  // @description ZodRecord 타입을 처리합니다.
   if (schema instanceof ZodRecord) {
     return {
       key1: createMockDataFromZodSchema(
@@ -137,38 +150,39 @@ export function createMockDataFromZodSchema(
     }
   }
 
-  // ZodString
-  // 예시: z.string()
+  // Handles ZodString.
+  // @description ZodString 타입을 처리합니다.
   if (schema instanceof ZodString) {
     if (customGenerators?.string) {
       return customGenerators.string(key)
     }
     return getRandomString(key)
   }
-  // ZodNumber
-  // 예시: z.number()
+  // Handles ZodNumber.
+  // @description ZodNumber 타입을 처리합니다.
   if (schema instanceof ZodNumber) {
     return customGenerators?.number
       ? customGenerators.number()
       : getRandomNumber()
   }
-  // ZodBoolean
-  // 예시: z.boolean()
+  // Handles ZodBoolean.
+  // @description ZodBoolean 타입을 처리합니다.
   if (schema instanceof ZodBoolean) {
     return customGenerators?.boolean
       ? customGenerators.boolean()
       : getRandomBoolean()
   }
-  // ZodDate
-  // 예시: z.date()
+  // Handles ZodDate.
+  // @description ZodDate 타입을 처리합니다.
   if (schema instanceof ZodDate) {
     return customGenerators?.dateTime
       ? customGenerators.dateTime()
       : getRandomDateTime()
   }
 
-  // ZodNativeEnum
-  // 예시: z.nativeEnum(MyEnum)
+  // Handles ZodNativeEnum.
+  // Example: z.nativeEnum(MyTSEnum)
+  // @description ZodNativeEnum 타입을 처리합니다.
   if (def.typeName === "ZodNativeEnum") {
     const values = (schema as any).getValues
       ? (schema as any).getValues()
@@ -180,8 +194,9 @@ export function createMockDataFromZodSchema(
     return values[randomIndex]
   }
 
-  // ZodTuple
-  // 예시: z.tuple([z.string(), z.number()])
+  // Handles ZodTuple types.
+  // Example: z.tuple([z.string(), z.number()])
+  // @description ZodTuple 타입을 처리합니다.
   if (schema instanceof ZodTuple) {
     return (def.items as any[]).map((item: ZodType, i: number) =>
       createMockDataFromZodSchema(
@@ -195,8 +210,9 @@ export function createMockDataFromZodSchema(
     )
   }
 
-  // ZodEnum
-  // 예시: z.enum(["A", "B", "C"])
+  // Handles ZodEnum types.
+  // Example: z.enum(["A", "B", "C"])
+  // @description ZodEnum 타입을 처리합니다.
   if (schema instanceof ZodEnum) {
     if (strategy === "fixed") {
       return schema.options[0]
@@ -205,14 +221,16 @@ export function createMockDataFromZodSchema(
     return options[Math.floor(Math.random() * options.length)]
   }
 
-  // ZodLiteral
-  // 예시: z.literal("foo")
+  // Handles ZodLiteral types.
+  // Example: z.literal("hello")
+  // @description ZodLiteral 타입을 처리합니다.
   if (schema instanceof ZodLiteral) {
     return schema.value
   }
 
-  // ZodUnion
-  // 예시: z.union([z.string(), z.number()])
+  // Handles ZodUnion types.
+  // Example: z.union([z.string(), z.number()])
+  // @description ZodUnion 타입을 처리합니다.
   if (schema instanceof ZodUnion) {
     const options = schema.options as ZodType[]
     if (strategy === "fixed") {
@@ -236,8 +254,9 @@ export function createMockDataFromZodSchema(
     )
   }
 
-  // ZodDiscriminatedUnion
-  // 예시: z.discriminatedUnion("type", [z.object({ type: z.literal("a"), ... }), ...])
+  // Handles ZodDiscriminatedUnion types.
+  // Example: z.discriminatedUnion("type", [z.object({ type: z.literal("a") }), ...])
+  // @description ZodDiscriminatedUnion 타입을 처리합니다.
   if (schema instanceof ZodDiscriminatedUnion) {
     const options: ZodType[] = Array.from((schema.options as any).values())
     if (options.length === 0) {
@@ -266,8 +285,9 @@ export function createMockDataFromZodSchema(
     )
   }
 
-  // ZodIntersection
-  // 예시: z.intersection(z.object({ a: z.string() }), z.object({ b: z.number() }))
+  // Handles ZodIntersection types.
+  // Example: z.intersection(z.object({ a: ... }), z.object({ b: ... }))
+  // @description ZodIntersection 타입을 처리합니다.
   if (schema instanceof ZodIntersection) {
     const mockLeft = createMockDataFromZodSchema(
       def.left as any,

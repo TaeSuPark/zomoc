@@ -189,6 +189,84 @@ export { api }
 - **Vite 프로젝트를 사용 중이라면,** 고민 없이 **Vite 플러그인**을 사용하세요. 최고의 개발 경험을 제공합니다.
 - **Next.js, CRA 등 다른 환경이라면,** **CLI**를 사용하세요. `--watch` 옵션을 함께 사용하면 매우 편리합니다.
 
+---
+
+## 🧪 독립적인 데이터 생성 (Storybook & 테스트용)
+
+Zomoc은 API 요청을 가로채는 것 외에도, 코드 내에서 데이터 생성기를 직접 사용할 수 있는 강력한 기능을 제공합니다. 이 기능은 Storybook의 스토리를 채우거나 단위/통합 테스트를 작성할 때처럼, API 호출 없이 타입-안전 Mock 데이터가 필요할 때 매우 유용합니다.
+
+### ✨ 알아두기: 스캔 동작 방식
+
+- **`mock.json`과 독립적:** 이 생성기는 `mock.json` 파일을 전혀 사용하지 않습니다. 대신, Zomoc 설정(`zomoc.config.ts` 또는 Vite 플러그인 옵션)에 정의된 `interfacePaths`를 직접 스캔하여 사용 가능한 모든 인터페이스를 레지스트리에 등록합니다.
+
+- **"생존자 원칙" 스캔:** Zomoc은 지정된 경로의 모든 인터페이스를 Zod 스키마로 변환하려고 시도합니다. 하지만 변환이 불가능한 경우(예: `ts-to-zod`가 지원하지 않는 복잡한 제네릭 사용, `interfacePaths` 외부에 정의된 타입을 가져와 사용하는 경우 등) 해당 인터페이스는 조용히 건너뜁니다. 이는 전체 프로세스가 중단되는 것을 막고, 성공적으로 변환된 "생존한" 스키마들로만 레지스트리를 구성하기 위함입니다. 따라서 특정 타입이 생성기에 없는 경우, 해당 타입의 정의를 확인해볼 필요가 있습니다.
+
+사용법은 간단합니다. Zomoc이 제공하는 `finalSchemaTypeMap`으로 생성기를 초기화한 뒤, 필요한 인터페이스의 이름을 호출하기만 하면 됩니다.
+
+### 1단계: `createGenerator`와 레지스트리 가져오기
+
+먼저, `zomoc`에서 `createGenerator` 함수를, 그리고 여러분의 개발 환경에 맞는 위치에서 `finalSchemaTypeMap`을 가져옵니다.
+
+**Vite 사용자 (가상 모듈):**
+
+```typescript
+import { createGenerator } from "zomoc"
+import { finalSchemaTypeMap } from "virtual:zomoc"
+```
+
+**CLI 사용자 (생성된 파일):**
+
+```typescript
+// 'zomoc/cli'의 import 경로는 프로젝트 구조에 따라 다를 수 있습니다.
+import { createGenerator } from "zomoc/cli"
+import { finalSchemaTypeMap } from "../.zomoc/registry" // 생성된 파일의 경로를 맞게 조정해주세요.
+```
+
+### 2단계: 생성기 만들고 사용하기
+
+필요한 모듈을 가져왔다면, 사용법은 어떤 환경에서든 동일합니다.
+
+```typescript
+// 1. 레지스트리로 생성기를 초기화합니다.
+const getMock = createGenerator(finalSchemaTypeMap)
+
+// 2. 스캔된 인터페이스의 이름을 전달하여 데이터를 생성합니다.
+// 반환값은 완벽하게 타입이 추론됩니다!
+const mockUser = getMock("IUser")
+const mockProduct = getMock("IProduct")
+
+// Storybook 스토리에서의 사용 예시:
+export default {
+  title: "Components/UserProfile",
+  component: UserProfile,
+  args: {
+    // 생성된 Mock 데이터를 prop으로 전달합니다.
+    user: getMock("IUser"),
+  },
+}
+```
+
+**고급 옵션:**
+`getMock` 함수의 두 번째 인자로 옵션 객체를 전달하여 데이터 생성 방식을 제어할 수 있습니다. 이를 통해 배열을 생성하거나(`repeatCount`), 페이지네이션 응답을 흉내내는 등, `mock.json`에서 사용하던 대부분의 고급 생성 전략을 동일하게 적용할 수 있습니다. 자세한 옵션은 [심층 가이드](#-심층-가이드) 섹션을 참고하세요.
+
+```typescript
+// 10명의 사용자 객체 배열 생성
+const userList = getMock("IUser", { repeatCount: 10 })
+
+// 페이지네이션 응답 모의
+// (IProductResponse가 { data: IProduct[], total: number } 형태라고 가정)
+const paginatedProducts = getMock("IProductResponse", {
+  pagination: {
+    itemsKey: "data", // 데이터 배열을 가리키는 키
+    totalKey: "total", // 전체 개수를 가리키는 키
+  },
+  page: 2,
+  size: 20,
+})
+```
+
+이 접근법을 통해, 인터셉터가 사용하는 것과 동일한 고품질의 타입-안전 Mock 데이터 엔진을 프로젝트 어디에서나 유연하게 사용할 수 있습니다.
+
 ## 📚 심층 가이드
 
 이 섹션에서는 고급 설정 및 기능에 대해 설명합니다.
