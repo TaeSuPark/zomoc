@@ -1,4 +1,4 @@
-import type { ZodType } from "zod"
+import { ZodType } from "zod"
 
 export interface ZomocCoreOptions {
   mockPaths?: string[]
@@ -26,6 +26,10 @@ export interface RegistryValue {
   repeatCount?: number
 }
 
+export type MockDataRegistry = Record<string, RegistryValue>
+export type UrlRegistry = Record<string, RegistryValue>
+export type TypeRegistry = Record<string, ZodType>
+
 export interface SetupMockingInterceptorOptions {
   /**
    * @description mocking interceptor를 활성화할지 여부를 결정합니다.
@@ -35,7 +39,7 @@ export interface SetupMockingInterceptorOptions {
   /**
    * @description zomoc으로 생성된 registry 객체를 전달합니다.
    */
-  registry: Record<string, RegistryValue>
+  registry: UrlRegistry
   /**
    * @description zomoc의 디버그 모드를 활성화합니다.
    * @default false

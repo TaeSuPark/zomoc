@@ -68,6 +68,7 @@ export async function generateRegistryString(
 
   const allSchemaDefinitions = new Map<string, string>() // Key: interface FILE PATH, Value: full zod schema string
   const finalRegistryEntries: string[] = []
+  const finalTypeRegistryEntries: string[] = []
 
   for (const mockFile of mockFiles) {
     try {
@@ -123,16 +124,21 @@ export async function generateRegistryString(
           const schemaName = `${camelCase(interfaceName, {
             preserveConsecutiveUppercase: true,
           })}Schema`
-          const definition = `
-  '${key}': {
+
+          const registryValueObject = `{
     schema: ${schemaName},
     pagination: ${
       paginationConfig ? JSON.stringify(paginationConfig) : "undefined"
     },
     strategy: '${mockingStrategy}',
     repeatCount: ${repeatCount ?? "undefined"}
-  },`
-          finalRegistryEntries.push(definition)
+  }`
+
+          const urlEntry = `'${key}': ${registryValueObject},`
+          finalRegistryEntries.push(urlEntry)
+
+          const typeEntry = `'${interfaceName}': ${schemaName},`
+          finalTypeRegistryEntries.push(typeEntry)
         }
       }
     } catch (e) {
@@ -146,9 +152,11 @@ export async function generateRegistryString(
     finalRegistryString += `${schemaFileContent}\n`
   }
 
-  const schemaEntries = finalRegistryEntries.join("\n")
+  const urlSchemaEntries = finalRegistryEntries.join("\n")
+  const typeSchemaEntries = finalTypeRegistryEntries.join("\n")
 
-  finalRegistryString += `\nexport const finalSchemaUrlMap = {\n${schemaEntries}\n} as const;\n`
+  finalRegistryString += `\nexport const finalSchemaUrlMap = {\n${urlSchemaEntries}\n} as const;\n`
+  finalRegistryString += `\nexport const finalSchemaTypeMap = {\n${typeSchemaEntries}\n} as const;\n`
 
   return finalRegistryString
 }
@@ -158,6 +166,6 @@ export async function generateViteVirtualModule(
   options?: ZomocCoreOptions
 ): Promise<string> {
   const registryString = await generateRegistryString(projectRoot, options)
-  // Vite 가상 모듈은 브라우저에서 직접 실행되므로, TypeScript 문법인 'as const'를 제거해야 합니다.
-  return registryString.replace(" as const", "")
+  // Vite 가상 모듈은 브라우저에서 직접 실행되므로, TypeScript 문법인 'as const'를 모두 제거해야 합니다.
+  return registryString.replace(/ as const/g, "")
 }
