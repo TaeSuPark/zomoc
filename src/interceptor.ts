@@ -145,7 +145,6 @@ export function setupMockingInterceptor(
               "font-weight: bold;",
               mockData
             )
-            console.log("%cUsed Zod Schema:", "font-weight: bold;", schema)
             console.groupEnd()
           }
         }
