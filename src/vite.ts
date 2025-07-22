@@ -64,10 +64,6 @@ export default function zomoc(options: ZomocVitePluginOptions = {}): Plugin {
           mockPaths: finalOptions.mockPaths,
           interfacePaths: finalOptions.interfacePaths,
         })
-        console.log(
-          "\n\x1b[35m[Zomoc] Generated Virtual Module Content:\n\x1b[0m",
-          registryString
-        )
         return registryString
       }
       return null

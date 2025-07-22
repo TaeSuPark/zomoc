@@ -1,6 +1,6 @@
 {
   "name": "zomoc",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A type-safe API mocking tool for frontend development, powered by axios and Zod.",
   "type": "module",
   "main": "./dist/index.js",
