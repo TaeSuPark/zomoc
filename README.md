@@ -259,9 +259,7 @@ const paginatedProducts = getMock("IProductResponse", {
   pagination: {
     itemsKey: "data", // The key for the data array
     totalKey: "total", // The key for the total count
-  },
-  page: 2,
-  size: 20,
+  }
 })
 ```
 
@@ -511,3 +509,11 @@ With this setup, `zomoc` will call your functions to generate context-aware data
 While Zomoc is a helpful tool, it has some limitations you should be aware of:
 
 - **Generic Types:** Zomoc relies on `ts-to-zod`
+
+## 🤝 Contributing
+
+Contributions are welcome! If you have a feature request, bug report, or pull request, please feel free to open an issue or PR.
+
+## License
+
+This project is licensed under the MIT License.

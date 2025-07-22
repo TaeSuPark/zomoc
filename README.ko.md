@@ -259,9 +259,7 @@ const paginatedProducts = getMock("IProductResponse", {
   pagination: {
     itemsKey: "data", // 데이터 배열을 가리키는 키
     totalKey: "total", // 전체 개수를 가리키는 키
-  },
-  page: 2,
-  size: 20,
+  }
 })
 ```
 
