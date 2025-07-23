@@ -67,47 +67,57 @@ async function generateSurvivedSchemas(
 ): Promise<Map<string, string>> {
   const survivedSchemaDeclarations = new Map<string, string>()
   const uniqueFilePaths = [...new Set(interfaceLocationMap.values())]
-  const declarationRegex = /export const (\w+Schema) = .*?;/gs
 
   for (const filePath of uniqueFilePaths) {
     try {
       const sourceText = await fs.readFile(filePath, "utf-8")
+      let sanitizedSourceText = sourceText
 
-      // Pre-process: Comment out generics to prevent ts-to-zod errors
+      // 1. "Enum 위장" 전략: ts-to-zod가 처리할 수 있도록 enum을 union 타입으로 변환합니다.
+      const enumRegex = /export (?:const\s+)?enum\s+(\w+)\s*{([\s\S]+?)}/g
+      sanitizedSourceText = sanitizedSourceText.replace(
+        enumRegex,
+        (_match, enumName, enumBody) => {
+          const enumMemberRegex = /['"]([^'"]+)['"]/g
+          const enumMembers: string[] = []
+          let memberMatch
+          while ((memberMatch = enumMemberRegex.exec(enumBody)) !== null) {
+            enumMembers.push(`'${memberMatch[1]}'`)
+          }
+
+          if (enumMembers.length === 0) {
+            return `/* Zomoc: Non-string enum '${enumName}' is not supported and has been commented out. */`
+          }
+          return `export type ${enumName} = ${enumMembers.join(" | ")};`
+        }
+      )
+
+      // 2. 제네릭 타입 주석 처리: ts-to-zod의 오류를 방지합니다.
       const genericTypeRegex =
         /export\s+(interface|type)\s+\w+<.+?>\s*=.+?;|export\s+(interface|type)\s+\w+<.+?>\s*{[\s\S]*?}/gs
-      const sanitizedSourceText = sourceText.replace(
+      sanitizedSourceText = sanitizedSourceText.replace(
         genericTypeRegex,
         (match) => `/* Zomoc: Generic type commented out\n${match}\n*/`
       )
 
+      // 3. ts-to-zod를 사용하여 Zod 스키마 생성
       const zodSchemaFileContent = generate({
         sourceText: sanitizedSourceText,
       }).getZodSchemasFile("")
 
-      // Post-process: Sanitize problematic React types
+      // 4. 리액트 특정 타입 처리: 런타임 오류 방지를 위해 z.any()로 변경합니다.
       const sanitizedContent = zodSchemaFileContent.replace(
         /z\.literal\(React\.\w+\)/g,
         "z.any()"
       )
 
-      // Extract and store survivor declarations by splitting the content.
-      // This is more robust than a single regex as it doesn't depend on matching
-      // the end of the declaration, which can be tricky.
-      // @description 정규식으로 선언의 끝을 찾는 방식은 까다로울 수 있으므로,
-      // `export const` 앞에 개행 문자가 오는 것을 기준으로 코드를 분리하는 것이 더 안정적입니다.
+      // 5. "생존자 원칙": 생성된 스키마 중 유효한 것만 추출하여 저장합니다.
       const declarations = sanitizedContent.split(/\n(?=export const)/g)
-
       for (const declaration of declarations) {
-        // Find the schema name from the declaration
         const match = declaration.match(/export const (\w+Schema) =/)
-
-        // We only care about valid schema declarations that we can name
-        // @description 이름과 함께 올바르게 선언된 스키마만 처리합니다.
         if (match && match[1]) {
           const schemaName = match[1]
           const trimmedDeclaration = declaration.trim()
-
           if (
             trimmedDeclaration &&
             !survivedSchemaDeclarations.has(schemaName)
@@ -136,7 +146,9 @@ async function buildInterfaceToSchemaNameMap(
   filePaths: string[]
 ): Promise<Map<string, string>> {
   const map = new Map<string, string>()
-  const interfaceRegex = /\bexport\s+interface\s+([A-Z]\w*)/g
+  // Matches both `export interface IUser` and `export type TUser = ...`
+  // @description `export interface IUser`와 `export type TUser = ...`를 모두 찾도록 정규식을 수정합니다.
+  const interfaceRegex = /\bexport\s+(?:interface|type)\s+([A-Z]\w*)/g
 
   for (const filePath of filePaths) {
     try {
