@@ -1,8 +1,19 @@
 // src/shared/lib/mockingInterceptor.ts
 import { createMockDataFromZodSchema } from "./generator"
-import type { AxiosInstance } from "axios"
+import type { AxiosInstance, AxiosResponse } from "axios"
 import { match } from "path-to-regexp"
 import type { SetupMockingInterceptorOptions } from "./types"
+
+const STATUS_TEXTS: Record<number, string> = {
+  200: "OK",
+  201: "Created",
+  204: "No Content",
+  400: "Bad Request",
+  401: "Unauthorized",
+  403: "Forbidden",
+  404: "Not Found",
+  500: "Internal Server Error",
+}
 
 /**
  * Sets up an axios request interceptor to mock API responses.
@@ -60,56 +71,61 @@ export function setupMockingInterceptor(
       // If a match is found, proceed to generate mock data.
       // @description 일치하는 패턴을 찾으면, Mock 데이터 생성을 진행합니다.
       if (matchResult) {
-        const { schema, pagination, strategy, repeatCount } =
-          registry[registeredPattern]
+        const {
+          schema,
+          responseBody,
+          status,
+          pagination,
+          strategy,
+          repeatCount,
+        } = registry[registeredPattern]
 
         let mockData
-        // If pagination is configured for this endpoint, generate paginated mock data.
-        // @description 해당 엔드포인트에 페이지네이션이 설정된 경우, 페이지네이션된 Mock 데이터를 생성합니다.
-        if (pagination) {
-          const pageKey = pagination.pageKey ?? "page"
-          const sizeKey = pagination.sizeKey ?? "size"
 
-          // Extract page and size from request params or body.
-          // @description 요청 파라미터 또는 본문에서 page와 size를 추출합니다.
-          const page = config.params?.[pageKey] ?? config.data?.[pageKey] ?? 1
-          const size = config.params?.[sizeKey] ?? config.data?.[sizeKey] ?? 10
+        if (responseBody !== undefined) {
+          mockData = responseBody
+        } else if (schema) {
+          if (pagination) {
+            const pageKey = pagination.pageKey ?? "page"
+            const sizeKey = pagination.sizeKey ?? "size"
 
-          const itemSchema = (schema as any).shape[pagination.itemsKey]
-          const pageData = createMockDataFromZodSchema(
-            itemSchema,
-            "",
-            customGenerators,
-            size,
-            page,
-            strategy
-          )
+            const page = config.params?.[pageKey] ?? config.data?.[pageKey] ?? 1
+            const size =
+              config.params?.[sizeKey] ?? config.data?.[sizeKey] ?? 10
 
-          mockData = {
-            [pagination.itemsKey]: pageData,
-            [pagination.totalKey]: 100, //  Dummy total
-            [pageKey]: page,
+            const itemSchema = (schema as any).shape[pagination.itemsKey]
+            const pageData = createMockDataFromZodSchema(
+              itemSchema,
+              "",
+              customGenerators,
+              size,
+              page,
+              strategy
+            )
+
+            mockData = {
+              [pagination.itemsKey]: pageData,
+              [pagination.totalKey]: 100, // Dummy total
+              [pageKey]: page,
+            }
+          } else {
+            mockData = createMockDataFromZodSchema(
+              schema,
+              "",
+              customGenerators,
+              repeatCount,
+              0,
+              strategy
+            )
           }
         } else {
-          // Generate non-paginated, standard mock data.
-          // @description 페이지네이션이 아닌 일반 Mock 데이터를 생성합니다.
-          mockData = createMockDataFromZodSchema(
-            schema,
-            "",
-            customGenerators,
-            repeatCount,
-            0,
-            strategy
-          )
+          mockData = {
+            message: `[Zomoc] No responseBody or schema found for this route. Defaulting response.`,
+          }
         }
 
-        // Log detailed information if debug mode is enabled.
-        // @description 디버그 모드가 활성화된 경우, 상세 정보를 로그로 남깁니다.
         if (debug) {
           const isServer = typeof window === "undefined"
-
-          // Use simple console logs in server environments (e.g., Node.js) as they don't support `groupCollapsed`.
-          // @description 서버 환경(예: Node.js)에서는 `groupCollapsed`를 지원하지 않으므로 단순 로그를 사용합니다.
           if (isServer) {
             console.log(`[Zomoc] Mocked Request: ${requestMethod} ${url}`)
             console.log(`  - Pattern: ${registeredPattern}`)
@@ -121,8 +137,6 @@ export function setupMockingInterceptor(
               JSON.stringify(mockData, null, 2)
             )
           } else {
-            // Use styled, collapsible groups in browser environments for better readability.
-            // @description 브라우저 환경에서는 가독성을 위해 스타일이 적용된 접을 수 있는 그룹 로그를 사용합니다.
             console.groupCollapsed(
               `%c[Zomoc] Mocked Request: %c${requestMethod} ${url}`,
               "color: #6e28d9; font-weight: bold;",
@@ -149,23 +163,38 @@ export function setupMockingInterceptor(
           }
         }
 
-        // This is the key to hijacking the request.
-        // We replace the default axios adapter with a custom one that resolves
-        // with our mock data, preventing any actual network call.
-        // @description 이 부분이 요청을 가로채는 핵심입니다.
-        // 기본 axios 어댑터를 Mock 데이터로 resolve하는 커스텀 어댑터로 교체하여,
-        // 실제 네트워크 호출을 방지합니다.
         config.adapter = (config: any) => {
-          return new Promise((resolve) => {
-            const res = {
+          return new Promise((resolve, reject) => {
+            const res: AxiosResponse = {
               data: mockData,
-              status: 200,
-              statusText: "OK",
+              status: status,
+              statusText: STATUS_TEXTS[status] ?? "Unknown Status",
               headers: { "x-zomoc-mocked": "true" },
               config,
               request: {},
             }
-            resolve(res as any)
+
+            if (status >= 400) {
+              // Mimic AxiosError structure for better compatibility
+              const error = {
+                isAxiosError: true,
+                response: res,
+                config: config,
+                toJSON: () => ({
+                  message: `Request failed with status code ${status}`,
+                  name: "AxiosError",
+                  config,
+                  response: {
+                    data: res.data,
+                    status: res.status,
+                    headers: res.headers,
+                  },
+                }),
+              }
+              reject(error)
+            } else {
+              resolve(res)
+            }
           })
         }
         break // Stop after finding the first matching pattern

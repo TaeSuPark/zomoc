@@ -1,5 +1,12 @@
 import { ZodType } from "zod"
 
+export type PaginationOptions = {
+  itemsKey: string
+  totalKey: string
+  pageKey?: string
+  sizeKey?: string
+}
+
 /**
  * Core options shared between different Zomoc environments (CLI, Vite plugin).
  * @description Zomoc의 다양한 환경(CLI, Vite 플러그인)에서 공유되는 핵심 옵션입니다.
@@ -59,17 +66,22 @@ export interface RegistryValue {
    * The Zod schema for the response type.
    * @description 응답 타입에 대한 Zod 스키마.
    */
-  schema: ZodType
+  schema?: ZodType
+  /**
+   * A direct response body to be returned, bypassing schema generation.
+   * @description 스키마 생성을 건너뛰고 직접 반환될 응답 본문입니다.
+   */
+  responseBody?: any
+  /**
+   * The HTTP status code of the mock response.
+   * @description 모의 응답의 HTTP 상태 코드입니다.
+   */
+  status: number
   /**
    * Configuration for paginated responses. If present, the interceptor will generate paginated mock data.
    * @description 페이지네이션 응답에 대한 설정. 이 값이 있으면 인터셉터가 페이지네이션된 Mock 데이터를 생성합니다.
    */
-  pagination?: {
-    itemsKey: string
-    totalKey: string
-    pageKey?: string
-    sizeKey?: string
-  }
+  pagination?: PaginationOptions
   /**
    * The data generation strategy. 'random' (default) or 'fixed' (for predictable data).
    * @description 데이터 생성 전략. 'random'(기본값) 또는 'fixed'(예측 가능한 데이터).
@@ -125,3 +137,32 @@ export interface SetupMockingInterceptorOptions {
    */
   customGenerators?: CustomGenerators
 }
+
+/**
+ * @description 'responses' 맵 내의 단일 응답 정의를 위한 설정 객체입니다.
+ */
+export type ResponseDefinition = {
+  responseType?: string
+  responseBody?: any
+  pagination?: PaginationOptions
+  repeatCount?: number
+  mockingStrategy?: "fixed" | "random"
+}
+
+/**
+ * '응답 맵 모드'를 사용할 때 API 엔드포인트에 대한 메인 설정 객체입니다.
+ */
+export type ResponseMap = {
+  status: number // 활성화할 응답을 선택하는 "스위치"
+  responses: {
+    [statusCode: string]: ResponseDefinition
+  }
+}
+
+/**
+ * 처리되기 전, mock.json의 URL 패턴에 연결된 값입니다.
+ */
+export type MockConfig =
+  | string // 단축형
+  | (Omit<ResponseDefinition, "responseBody"> & { status?: number }) // 단순 모드
+  | ResponseMap // 응답 맵 모드

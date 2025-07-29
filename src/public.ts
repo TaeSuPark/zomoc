@@ -1,5 +1,5 @@
 import { z } from "zod"
-import type { CustomGenerators, TypeRegistry } from "./types"
+import type { CustomGenerators, PaginationOptions, TypeRegistry } from "./types"
 import { createMockDataFromZodSchema } from "./generator"
 
 /**
@@ -36,12 +36,7 @@ export function createGenerator<T extends TypeRegistry>(
   function getZomocGenerator<K extends keyof T>(
     typeName: K,
     options: {
-      pagination?: {
-        itemsKey: string
-        totalKey: string
-        pageKey?: string
-        sizeKey?: string
-      }
+      pagination?: PaginationOptions
       repeatCount?: number
       strategy?: "fixed" | "random"
       page?: number

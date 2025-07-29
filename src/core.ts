@@ -2,7 +2,12 @@ import { glob } from "glob"
 import { generate } from "ts-to-zod"
 import fs from "fs/promises"
 import camelCase from "camelcase"
-import type { ZomocCoreOptions } from "./types"
+import type {
+  MockConfig,
+  ResponseDefinition,
+  ResponseMap,
+  ZomocCoreOptions,
+} from "./types"
 
 /**
  * Scans all specified file paths to find exported TypeScript interfaces and types.
@@ -261,36 +266,104 @@ export async function generateRegistryString(
         const mockMap = JSON.parse(mockContent)
 
         for (const [key, value] of Object.entries(mockMap)) {
-          let interfaceName: string
-          let paginationConfig: any = null
-          let mockingStrategy: "random" | "fixed" = "random"
-          let repeatCount: number | undefined
+          const mockConfig = value as MockConfig
 
-          if (typeof value === "string") {
-            interfaceName = value
-          } else if (typeof value === "object" && value !== null) {
-            const mockConfig = value as any
-            interfaceName = mockConfig.responseType
-            paginationConfig = mockConfig.pagination
-            mockingStrategy = mockConfig.mockingStrategy || "random"
-            repeatCount = mockConfig.repeatCount
-          } else {
-            continue
-          }
+          // --- Response Map Mode ---
+          if (
+            typeof mockConfig === "object" &&
+            mockConfig !== null &&
+            "responses" in mockConfig
+          ) {
+            const responseMap = mockConfig as ResponseMap
+            const activeStatusKey = String(responseMap.status)
+            let activeResponse: ResponseDefinition | undefined =
+              responseMap.responses[activeStatusKey]
+            let finalStatus = responseMap.status
 
-          const schemaName = `${camelCase(interfaceName, {
-            preserveConsecutiveUppercase: true,
-          })}Schema`
+            // Fallback to the first available response if the activeStatus is not found
+            if (!activeResponse) {
+              const fallbackStatusKey = Object.keys(responseMap.responses)[0]
+              if (fallbackStatusKey) {
+                activeResponse = responseMap.responses[fallbackStatusKey]
+                finalStatus = Number(fallbackStatusKey)
+                console.warn(
+                  `[Zomoc] Warning: status ${activeStatusKey} not found in responses for '${key}'. Falling back to the first available status: ${finalStatus}.`
+                )
+              }
+            }
 
-          if (survivedSchemaDeclarations.has(schemaName)) {
+            if (!activeResponse) continue
+
+            const schemaName = activeResponse.responseType
+              ? `${camelCase(activeResponse.responseType, {
+                  preserveConsecutiveUppercase: true,
+                })}Schema`
+              : undefined
+
+            if (schemaName && !survivedSchemaDeclarations.has(schemaName)) {
+              continue
+            }
+
             const registryValueObject = `{
-      schema: ${schemaName},
-      pagination: ${
-        paginationConfig ? JSON.stringify(paginationConfig) : "undefined"
-      },
-      strategy: '${mockingStrategy}',
-      repeatCount: ${repeatCount ?? "undefined"}
-    }`
+    schema: ${schemaName || "undefined"},
+    responseBody: ${
+      activeResponse.responseBody
+        ? JSON.stringify(activeResponse.responseBody)
+        : "undefined"
+    },
+    status: ${finalStatus},
+    pagination: ${
+      activeResponse.pagination
+        ? JSON.stringify(activeResponse.pagination)
+        : "undefined"
+    },
+    strategy: '${activeResponse.mockingStrategy || "random"}',
+    repeatCount: ${activeResponse.repeatCount ?? "undefined"}
+  }`
+            const urlEntry = `'${key}': ${registryValueObject},`
+            urlMapEntries.push(urlEntry)
+          }
+          // --- Simple Mode (for backward compatibility) ---
+          else {
+            let responseDef: Omit<ResponseDefinition, "responseBody"> & {
+              status?: number
+            } = {}
+
+            if (typeof mockConfig === "string") {
+              responseDef = { responseType: mockConfig, status: 200 }
+            } else if (typeof mockConfig === "object" && mockConfig !== null) {
+              const { responseBody, ...rest } = mockConfig as any
+              if (responseBody) {
+                console.warn(
+                  `[Zomoc] Warning: 'responseBody' is not supported in simple mode for '${key}'. Please use the 'responses' map structure.`
+                )
+              }
+              responseDef = { ...rest, status: rest.status || 200 }
+            } else {
+              continue
+            }
+
+            const schemaName = responseDef.responseType
+              ? `${camelCase(responseDef.responseType, {
+                  preserveConsecutiveUppercase: true,
+                })}Schema`
+              : undefined
+
+            if (schemaName && !survivedSchemaDeclarations.has(schemaName)) {
+              continue
+            }
+
+            const registryValueObject = `{
+    schema: ${schemaName || "undefined"},
+    status: ${responseDef.status},
+    pagination: ${
+      responseDef.pagination
+        ? JSON.stringify(responseDef.pagination)
+        : "undefined"
+    },
+    strategy: '${responseDef.mockingStrategy || "random"}',
+    repeatCount: ${responseDef.repeatCount ?? "undefined"}
+  }`
             const urlEntry = `'${key}': ${registryValueObject},`
             urlMapEntries.push(urlEntry)
           }
