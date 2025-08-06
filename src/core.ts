@@ -356,14 +356,14 @@ export async function generateRegistryString(
             const registryValueObject = `{
     schema: ${schemaName || "undefined"},
     status: ${responseDef.status},
-    pagination: ${
-      responseDef.pagination
-        ? JSON.stringify(responseDef.pagination)
-        : "undefined"
-    },
+      pagination: ${
+        responseDef.pagination
+          ? JSON.stringify(responseDef.pagination)
+          : "undefined"
+      },
     strategy: '${responseDef.mockingStrategy || "random"}',
     repeatCount: ${responseDef.repeatCount ?? "undefined"}
-  }`
+    }`
             const urlEntry = `'${key}': ${registryValueObject},`
             urlMapEntries.push(urlEntry)
           }

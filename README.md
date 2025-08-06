@@ -259,7 +259,7 @@ const paginatedProducts = getMock("IProductResponse", {
   pagination: {
     itemsKey: "data", // The key for the data array
     totalKey: "total", // The key for the total count
-  }
+  },
 })
 ```
 
@@ -268,6 +268,54 @@ This approach allows you to flexibly use the same high-quality, type-safe mock d
 ## 📚 In-Depth Guide
 
 This section covers advanced configuration and features.
+
+### Mocking Error Responses and Multiple Statuses
+
+While the simple configuration is great for mocking successful "happy path" responses (200 OK), Zomoc also provides a powerful "Response Map Mode" to handle various HTTP status codes and error cases for a single API endpoint. This allows you to robustly test how your application behaves in different scenarios, such as when data is not found (404) or a server error occurs (500).
+
+The core idea is to use a `responses` object where each key is an HTTP status code, and a top-level `status` property acts as a "switch" to determine which response is currently active.
+
+**1. Configure the `responses` map in your mock definition:**
+
+**`src/api/mock.json`**
+
+```json
+{
+  "GET /api/user/:id": {
+    "status": 404,
+    "responses": {
+      "200": {
+        "responseType": "IUserProfile"
+      },
+      "404": {
+        "responseBody": { "message": "User not found" }
+      },
+      "500": {
+        "responseBody": { "error": "Internal Server Error" }
+      }
+    }
+  }
+}
+```
+
+- `status`: This is the **switch**. The value here (e.g., `404`) determines which of the definitions inside `responses` will be used. You can change this value to easily switch between testing a success, a not-found error, or a server error.
+- `responses`: This object maps status codes to their respective response definitions.
+  - `"200"`: For a 200 status, Zomoc will generate data based on the `IUserProfile` interface as usual.
+  - `"404"` and `"500"`: For these statuses, we use `responseBody`.
+
+**2. Using `responseBody` for Direct Data Injection**
+
+The `responseBody` key allows you to bypass the schema-based data generation and return a specific, predefined JSON object directly. This is perfect for defining fixed error messages or testing edge-case data structures.
+
+> **Note:** `responseBody` takes precedence. If both `responseBody` and `responseType` are defined for the same response, the value in `responseBody` will always be used. `responseBody` can only be used inside the `responses` map.
+
+**3. `AxiosError`-Compliant Responses**
+
+When Zomoc serves a response with a status code of 400 or higher, it doesn't just resolve the promise with an error status. Instead, it **rejects the promise with an `AxiosError`-like object**. This object includes properties like `isAxiosError: true` and a `response` object containing the status, data, etc.
+
+This is a critical feature because it means your application's error handling logic (e.g., `try...catch` blocks or `react-query`'s `onError` callback) will work identically for both real API errors and mocked errors, ensuring your tests are realistic and reliable.
+
+---
 
 ### Pagination Mocking
 

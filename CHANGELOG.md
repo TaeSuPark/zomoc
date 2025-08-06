@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.2.0] - 2025-08-06
 
 ### Added
 
@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Mocking Logic in `core.ts`**: The core parsing logic was significantly refactored to distinguish between "Simple Mode" (for backward compatibility) and the new "Response Map Mode".
 - **Interceptor Logic in `interceptor.ts`**: The interceptor was updated to handle the new rich data structure from `core.ts`, implementing a priority system (`responseBody` > `responseType` > `default`) for generating the response body.
 
-## [0.1.3] - 2024-05-23
+## [0.1.3] - 2025-07-23
 
 ### Added
 
@@ -30,19 +30,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Corrected the pagination example for `getMock` in the README file.
 
-## [0.1.2] - 2024-05-23
+## [0.1.2] - 2025-07-22
 
 ### Fixed
 
 - Removed excessive logging from the Vite virtual module that occurred on every request.
 
-## [0.1.1] - 2024-05-23
+## [0.1.1] - 2025-07-22
 
 ### Fixed
 
 - Removed an unnecessary `console.log` of the Zod schema during the interception process.
 
-## [0.1.0] - 2024-05-22
+## [0.1.0] - 2025-07-22
 
 ### Added
 
